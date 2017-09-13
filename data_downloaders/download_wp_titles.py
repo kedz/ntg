@@ -14,8 +14,10 @@ query_template = "https://{lang}.wikipedia.org/w/api.php?" \
 def get_pages(cat, lang):
     query = query_template.format(
         lang=lang, type="page", title=quote(cat.replace(" ", "_")))
-    result = urllib.request.urlopen(query)
-    data = json.load(result)
+    result = urllib.request.urlopen(query).readall()
+    if isinstance(result, bytes):
+        result = result.decode("utf8")
+    data = json.loads(result)
     category = data['query']['categorymembers']
     
     pages = []
@@ -34,8 +36,10 @@ def get_pages(cat, lang):
 def get_subcats(cat, lang):
     query = query_template.format(
         lang=lang, type="subcat", title=quote(cat.replace(" ", "_")))
-    result = urllib.request.urlopen(query)
-    data = json.load(result)
+    result = urllib.request.urlopen(query).readall()
+    if isinstance(result, bytes):
+        result = result.decode("utf8")
+    data = json.loads(result)
     category = data['query']['categorymembers']
     
     cats = []
