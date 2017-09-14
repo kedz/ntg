@@ -7,11 +7,14 @@ from nltk.tokenize import word_tokenize
 from bs4 import BeautifulSoup
 import re
 
+def get_cols():
+    rows, columns = os.popen('stty size', 'r').read().split()
+    return int(columns)
+COL = get_cols()
 
-
-
-##from nltk.tokenize import sent_tokenize 
-
+class NoHTMLException(Exception):
+    def __init__(self):
+        super(Exception, self).__init__("No html found!")
 
 def read_names(path):
     names = set()
@@ -29,6 +32,8 @@ def get_page(name, prefix):
     content = page.content.split("\n\n")[0].strip()
     content = re.sub(r"[\s\n\r\t]+", r" ", content)
     html = get_html_intro(page.html())
+    if html is None: 
+        raise NoHTMLException()
     html = re.sub(r"[\s\n\r\t]+", r" ", html)
 
     return title, url, content, html
@@ -69,13 +74,10 @@ def get_html_intro(html):
             return str(element).strip()
 
 
-def get_cols():
-    rows, columns = os.popen('stty size', 'r').read().split()
-    return int(columns)
 
 
 def clear_screen():
-    sys.stdout.write("\r" + " " * get_cols())
+    sys.stdout.write("\r" + " " * COL)
     sys.stdout.write("\r")
     sys.stdout.flush()
 
@@ -83,14 +85,31 @@ def clear_screen():
 TEMPLATE = "{swp_cats}\t{swp_title}\t{swp_url}\t{swp_content}\t{swp_html}\t" \
     "{wp_title}\t{wp_url}\t{wp_content}\t{wp_html}\n"
 
+
+def cache_previous_try(path):
+    cache = {}
+    with open(path, "r") as f:
+        f.readline()
+        for line in f:
+            items = line.strip().split("\t")
+            assert(len(items) == 9)
+            cache[items[5]] = line
+    return cache
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         "Download parallel simple/regular wp corpus.")
     parser.add_argument(
         "--category-paths", nargs="+", required=True, type=str)
     parser.add_argument("--output", required=True, type=str)
+    parser.add_argument("--overwrite", action="store_true", default=False)
 
     args = parser.parse_args()
+
+    if os.path.exists(args.output) and not args.overwrite:
+        cache = cache_previous_try(args.output)
+    else:
+        cache = {}
 
     output_dir = os.path.dirname(args.output)
     if output_dir != "" and not os.path.exists(output_dir):
@@ -105,7 +124,7 @@ if __name__ == "__main__":
 
     names_cats = sorted(all_names.items(), key=lambda x: x[0])
 
-    with open(args.output, "w") as f:
+    with open(args.output + ".tmp", "w") as f:
         f.write("swp_cats\tswp_title\tswp_url\tswp_content\tswp_html\t")
         f.write("wp_title\twp_url\twp_content\twp_html\n")
         for i, (name, cats) in enumerate(names_cats, 1):
@@ -115,18 +134,39 @@ if __name__ == "__main__":
             clear_screen()
             msg = "{}/{} page {} ({})".format(
                 i, len(names_cats), name, cat_str)
-            sys.stdout.write(msg[:get_cols()])
+            sys.stdout.write(msg[:COL])
             sys.stdout.flush()
 
-            swp_title, swp_url, swp_text, swp_html = get_simple_wp_page(name)
-            wp_title, wp_url, wp_text, wp_html = get_wp_page(name, swp_text)
-            line = TEMPLATE.format(
-                swp_cats=cat_str, swp_title=swp_title, swp_url=swp_url, 
-                swp_content=swp_text, swp_html=swp_html,
-                wp_title=wp_title, wp_url=wp_url, wp_content=wp_text, 
-                wp_html=wp_html)
+            if name in cache:
+                f.write(cache[name])
+                del cache[name]
+                f.flush()
+                continue
 
-            f.write(line)
-            f.flush()
+            try:
+                swp_title, swp_url, swp_text, swp_html = get_simple_wp_page(
+                    name)
+                wp_title, wp_url, wp_text, wp_html = get_wp_page(
+                    name, swp_text)
+                line = TEMPLATE.format(
+                    swp_cats=cat_str, swp_title=swp_title, swp_url=swp_url, 
+                    swp_content=swp_text, swp_html=swp_html,
+                    wp_title=wp_title, wp_url=wp_url, wp_content=wp_text, 
+                    wp_html=wp_html)
+
+                f.write(line)
+                f.flush()
+            except wikipedia.exceptions.DisambiguationError as e:
+                print("\ndisambig: {}".format(name))
+                continue
+            except wikipedia.exceptions.PageError as e:
+                print("\npage error: {}".format(name))
+                continue
+            except NoHTMLException as e:
+                print("\nno html: {}".format(name))
+                continue
+            except wikipedia.exceptions.WikipediaException as e:
+                print("\nunknown: {}".format(name))
+                continue
         
     print("")
