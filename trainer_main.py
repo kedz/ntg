@@ -1,9 +1,11 @@
+import sys
 import argparse
 from dataio import extract_vocab_from_tsv, extract_dataset_from_tsv
 from encoder import RNNEncoder
 from decoder import RNNDecoder
 from base_model import Seq2SeqModel
 
+import math
 import random
 random.seed(1986)
 import torch
@@ -15,35 +17,45 @@ if __name__ == "__main__":
 
     parser.add_argument("--train", required=True)
     parser.add_argument("--valid", required=True)
+    parser.add_argument("--lr", required=False, default=.001, type=float)
+    parser.add_argument("--batch-size", default=16, type=int, required=False)
     parser.add_argument(
         "--embedding-dim", required=False, type=int, default=300)
     parser.add_argument(
         "--attention", required=False, choices=["none", "dot",],
         default="dot")
+    parser.add_argument(
+        "--src-tgt-fields", required=False, default=(0, 1,), type=int,
+        nargs=2)
+    parser.add_argument("--meta-field", required=False, default=None, type=int)
 
     args = parser.parse_args()
 
-    vocab_src, vocab_tgt = extract_vocab_from_tsv(args.train)
+    vocab_src, vocab_tgt = extract_vocab_from_tsv(
+        args.train, 
+        source_field=args.src_tgt_fields[0],
+        target_field=args.src_tgt_fields[1])
     data_train = extract_dataset_from_tsv(args.train, vocab_src, vocab_tgt)
-
+    data_train.set_batch_size(args.batch_size)
 
     enc = RNNEncoder(vocab_src.size, args.embedding_dim)
     dec = RNNDecoder(vocab_tgt, args.embedding_dim, 
         attention_mode=args.attention)
     
+
     model = Seq2SeqModel(enc, dec)
 
     model.train()
 
-    optimizer = torch.optim.Adagrad(model.parameters(), lr=.01)
+    optimizer = torch.optim.Adagrad(model.parameters(), lr=args.lr)
     import torch.nn.functional as F
 
 
     for e in range(15):
         total_loss = 0
-        steps = 0
-        for batch in data_train.iter_batch():
-            steps += 1
+        total_ex = 0
+        max_batches = math.ceil(data_train.size / args.batch_size) 
+        for i, batch in enumerate(data_train.iter_batch(), 1):
             optimizer.zero_grad()
 
             logits = model(batch)
@@ -55,11 +67,18 @@ if __name__ == "__main__":
                 tgt_out.size(0) * tgt_out.size(1))        
             
             loss = F.cross_entropy(logits_flat, tgt_out_flat, ignore_index=0)
-            total_loss += loss.data[0]
+            total_loss += loss.data[0] * batch.source.data.size(0)
+            total_ex += batch.source.data.size(0)
+            sys.stdout.write("\r{}/{} ({:0.3f}%) nll={:0.3f}".format(
+                i, max_batches, i / max_batches * 100, 
+                total_loss / total_ex))
+            sys.stdout.flush()
+
 
             loss.backward()            
             optimizer.step()
-        print(e, total_loss / steps)        
+        print("")
+        print(e, total_loss / total_ex)        
 
 
     

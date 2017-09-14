@@ -132,6 +132,9 @@ class Seq2SeqDataset(object):
     @property
     def batch_size(self):
         return self.batch_size_
+
+    def set_batch_size(self, batch_size):
+        self.batch_size_ = batch_size
     
     @property
     def chunk_size(self):
