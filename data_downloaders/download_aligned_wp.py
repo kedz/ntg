@@ -47,6 +47,8 @@ def get_wp_page(name, swp_content):
     try:
         return get_page(name, "en")
     except wikipedia.exceptions.DisambiguationError as e:
+        raise e
+        # TODO need to fix this later.
         swp_tokens = set(word_tokenize(swp_content.lower()))
         
         best_match = None
@@ -103,6 +105,8 @@ if __name__ == "__main__":
         "--category-paths", nargs="+", required=True, type=str)
     parser.add_argument("--output", required=True, type=str)
     parser.add_argument("--overwrite", action="store_true", default=False)
+    parser.add_argument(
+        "--range", required=False, default=None, nargs=2, type=int)
 
     args = parser.parse_args()
 
@@ -124,7 +128,10 @@ if __name__ == "__main__":
 
     names_cats = sorted(all_names.items(), key=lambda x: x[0])
 
-    with open(args.output + ".tmp", "w") as f:
+    if args.range is not None:
+        names_cats = names_cats[args.range[0]:args.range[1]]
+
+    with open(args.output, "w") as f:
         f.write("swp_cats\tswp_title\tswp_url\tswp_content\tswp_html\t")
         f.write("wp_title\twp_url\twp_content\twp_html\n")
         for i, (name, cats) in enumerate(names_cats, 1):
@@ -158,15 +165,23 @@ if __name__ == "__main__":
                 f.flush()
             except wikipedia.exceptions.DisambiguationError as e:
                 print("\ndisambig: {}".format(name))
+                f.write("{}\t{}\t{}\n".format(cat_str, name, "disambig"))
+                f.flush()
                 continue
             except wikipedia.exceptions.PageError as e:
                 print("\npage error: {}".format(name))
+                f.write("{}\t{}\t{}\n".format(cat_str, name, "page_error"))
+                f.flush()
                 continue
             except NoHTMLException as e:
                 print("\nno html: {}".format(name))
+                f.write("{}\t{}\t{}\n".format(cat_str, name, "no_html"))
+                f.flush()
                 continue
             except wikipedia.exceptions.WikipediaException as e:
                 print("\nunknown: {}".format(name))
+                f.write("{}\t{}\t{}\n".format(cat_str, name, "wp_exc"))
+                f.flush()
                 continue
         
     print("")
