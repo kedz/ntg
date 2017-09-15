@@ -5,6 +5,7 @@ from urllib.parse import quote
 import urllib.request
 import json
 import time
+#import http.client
 
 
 query_template = "https://{lang}.wikipedia.org/w/api.php?" \
@@ -14,7 +15,9 @@ query_template = "https://{lang}.wikipedia.org/w/api.php?" \
 def get_pages(cat, lang):
     query = query_template.format(
         lang=lang, type="page", title=quote(cat.replace(" ", "_")))
-    result = urllib.request.urlopen(query).readall()
+    result = urllib.request.urlopen(query).read()
+    #if isinstance(result, http.client.HTTPResponse):
+    #    result = result.readall()
     if isinstance(result, bytes):
         result = result.decode("utf8")
     data = json.loads(result)
@@ -36,7 +39,7 @@ def get_pages(cat, lang):
 def get_subcats(cat, lang):
     query = query_template.format(
         lang=lang, type="subcat", title=quote(cat.replace(" ", "_")))
-    result = urllib.request.urlopen(query).readall()
+    result = urllib.request.urlopen(query).read()
     if isinstance(result, bytes):
         result = result.decode("utf8")
     data = json.loads(result)
@@ -79,7 +82,7 @@ if __name__ == "__main__":
 
     output_dir = os.path.dirname(args.output)
     if output_dir != "" and not os.path.exists(output_dir):
-        os.mkdir(output_dir)
+        os.makedirs(output_dir)
 
     queue = [args.category]
 
