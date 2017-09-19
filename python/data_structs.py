@@ -85,24 +85,83 @@ class Vocab(object):
     def size(self):
         return len(self.idx2token_)
 
+class LengthVocab(Vocab):
+    def __init__(self, preprocessor, at_least=1, top_k=DEFAULT_MAX_VOCAB_SIZE,
+                 special_tokens=None, unknown_token=None, sparse=True):
+
+        if not isinstance(preprocessor, VocabPreprocessor):
+            raise Exception("First arg must be a VocabPreprocessor object.")
+
+        self.pp_ = preprocessor.freeze()
+        self.top_k_ = top_k
+        self.at_least_ = at_least
+        self.sparse_ = sparse
+
+        idx2token, token2idx = self.get_vocab_from_counts_(self.pp_.counts())
+        
+        if special_tokens is not None:
+            for t in special_tokens:
+                token2idx[t] = len(idx2token)
+                idx2token.append(t)
+        
+        if unknown_token is not None:
+            self.unk_idx_ = len(idx2token)
+            token2idx[unknown_token] = self.unk_idx_
+            idx2token.append(unknown_token)
+        else:
+            self.unk_idx_ = None
+
+        self.idx2token_ = idx2token
+        self.token2idx_ = token2idx
+
+    def get_vocab_from_counts_(self, counts):
+        counts = sorted(counts.items(), key=lambda x: int(x[0]))
+        idx2tokens = [token for token, count in counts[:self.top_k] 
+                      if count >= self.at_least]
+
+        # 0 is the pad token and not used.
+        idx2tokens = ["_PAD_"] + idx2tokens
+
+        token2idx = {token: index for index, token in enumerate(idx2tokens)}
+
+        return idx2tokens, token2idx
+
+
+
+
 class Seq2SeqDataset(object):
     def __init__(self, source, source_length, target_in, target_out, 
-                 target_length):
+                 target_length, target_length_toks):
         self.source_ = source
         self.source_length_ = source_length
         
         self.target_in_ = target_in
         self.target_out_ = target_out
         self.target_length_ = target_length
+        self.target_length_toks_ = target_length_toks
 
         self.batch_size_ = 2
         self.chunk_size_ = 10
+
+        self.gpu_ = 0
 
         self.buf1 = torch.LongTensor()
         self.buf2 = torch.LongTensor()
         self.buf3 = torch.LongTensor()
         self.buf4 = torch.LongTensor()
         self.buf5 = torch.LongTensor()
+        self.buf6 = torch.LongTensor()
+
+    def set_gpu(self, gpu):
+        self.gpu_ = gpu
+        if self.gpu_ > -1:
+            with torch.cuda.device(self.gpu_):
+                self.cbuf1 = torch.cuda.LongTensor()
+                self.cbuf2 = torch.cuda.LongTensor()
+                self.cbuf3 = torch.cuda.LongTensor()
+                self.cbuf4 = torch.cuda.LongTensor()
+                self.cbuf5 = torch.cuda.LongTensor()
+                self.cbuf6 = torch.cuda.LongTensor()
 
     def set_batch_size(self, batch_size):
         if not isinstance(batch_size, int) or batch_size < 1:
@@ -174,24 +233,49 @@ class Seq2SeqDataset(object):
 
             tgt_in_b = self.target_in[:,:max_tgt_len].index_select(
                 0, indices_batch, out=self.buf3)
-            tgt_out_b = self.target_out[:,:max_tgt_len].index_select(
-                0, indices_batch, out=self.buf4)
-            #tgt_in_b = tgt_in_b[:,:max_tgt_len]
-            #tgt_out_b = tgt_out_b[:,:max_tgt_len]
+            tgt_out_b = self.target_out[:,:max_tgt_len].t().index_select(
+                1, indices_batch, out=self.buf4)
+
+            if isinstance(self.target_length_toks_, torch.LongTensor):
+                tgt_lt_b = self.target_length_toks_.index_select(
+                0, indices_batch, out=self.buf6)
+            else:
+                tgt_lt_b = None
+
+            if self.gpu_ > -1:
+
+                src_b = self.cbuf1.resize_(src_b.size()).copy_(src_b)
+                src_len_b = self.cbuf2.resize_(src_len_b.size()).copy_(
+                    src_len_b)
+                tgt_in_b = self.cbuf3.resize_(tgt_in_b.size()).copy_(tgt_in_b)
+                tgt_out_b = self.cbuf4.resize_(tgt_out_b.size()).copy_(
+                    tgt_out_b)
+                tgt_len_b = self.cbuf5.resize_(tgt_len_b.size()).copy_(
+                    tgt_len_b)
+                if isinstance(self.target_length_toks_, torch.LongTensor):
+                    tgt_lt_b = self.cbuf6.resize_(tgt_lt_b.size()).copy_(
+                        tgt_lt_b)
+
 
             batch = Seq2SeqBatch(
-                src_b, src_len_b, tgt_in_b, tgt_out_b, tgt_len_b)
+                src_b, src_len_b, tgt_in_b, tgt_out_b.t(), tgt_len_b, tgt_lt_b)
             yield batch
 
 
 class Seq2SeqBatch(object):
     def __init__(self, source, source_length, target_in, target_out, 
-                 target_length):
+                 target_length, tgt_lt_b=None):
         self.source_ = Variable(source)
         self.source_length_ = source_length
         self.target_in_ = Variable(target_in)
         self.target_out_ = Variable(target_out)
         self.target_length_ = target_length
+        if isinstance(tgt_lt_b, torch.LongTensor):
+            self.target_len_tok_ = Variable(tgt_lt_b)
+        elif isinstance(tgt_lt_b, torch.cuda.LongTensor):
+            self.target_len_tok_ = Variable(tgt_lt_b)
+        else:
+            self.target_len_tok_ = None
 
     @property
     def source(self):

@@ -2,12 +2,16 @@ from collections import defaultdict
 import pandas as pd
 import re
 
+
+def _tokenize(tokens):
+    return tokens.split()
+
 class TextPreprocessor(object):
 
     def __init__(self, tokenizer=None, lower=True, replace_digits=True):
         
         if tokenizer is None:
-            tokenizer = lambda x: x.split()
+            tokenizer = _tokenize
         
         self.tokenizer_ = tokenizer
         self.lower_ = lower
@@ -22,8 +26,8 @@ class TextPreprocessor(object):
 
 
 class VocabPreprocessor(TextPreprocessor):
-    def __init__(self, field):
-        super(VocabPreprocessor, self).__init__()
+    def __init__(self, field, replace_digits=True):
+        super(VocabPreprocessor, self).__init__(replace_digits=replace_digits)
         self.field_ = field
         self.counts_ = defaultdict(int)
         self.total_lines_ = 0
