@@ -1,66 +1,163 @@
+import sys
 import argparse
-from dataio import extract_vocab_from_tsv, extract_dataset_from_tsv
-from encoder import RNNEncoder
-from decoder import RNNDecoder
-from base_model import Seq2SeqModel
+from dataio import extract_vocab_from_tsv, extract_dataset_from_tsv, load_data
+import model_builder
+import trainer
 
 import random
-random.seed(1986)
 import torch
-torch.manual_seed(1986)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser("Train CNN classifier.")
+    parser = argparse.ArgumentParser("Train seq2seq.")
 
     parser.add_argument("--train", required=True)
     parser.add_argument("--valid", required=True)
     parser.add_argument(
+        "--rnn", required=False, type=str, default="rnn",
+        choices=["rnn", "gru", "lstm"])
+    parser.add_argument("--num-layers", default=1, type=int, required=False)
+    parser.add_argument("--bidirectional", default=1, type=int, 
+        choices=[0,1])
+    parser.add_argument("--lr", required=False, default=.001, type=float)
+    parser.add_argument("--batch-size", default=16, type=int, required=False)
+    parser.add_argument(
         "--embedding-dim", required=False, type=int, default=300)
+    parser.add_argument(
+        "--hidden-dim", required=False, type=int, default=300)
     parser.add_argument(
         "--attention", required=False, choices=["none", "dot",],
         default="dot")
+    parser.add_argument(
+        "--src-tgt-fields", required=False, default=(0, 1,), type=int,
+        nargs=2)
+
+    parser.add_argument(
+        "--length-mode", default="none", type=str,
+        choices=["none", "decoder-input-embedding1"])
+    parser.add_argument("--length-field", required=False, default=2, type=int)
+    parser.add_argument(
+        "--len-embedding-dim", default=50, required=False, type=int)
+
+    parser.add_argument("--gpu", default=-1, type=int, required=False)
+    parser.add_argument("--epochs", default=25, type=int, required=False)
+    parser.add_argument("--seed", default=83419234, type=int, required=False)
+    parser.add_argument(
+        "--optimizer", default="adagrad", type=str, required=False,
+        choices=["sgd", "adagrad", "adadelta", "adam"])
+    parser.add_argument("--dropout", default=0.0, required=False, type=float)
+    parser.add_argument("--save-path", default=None, required=False, type=str)
+    parser.add_argument(
+        "--enc-vocab-size", default=40000, type=int, required=False)
+    parser.add_argument(
+        "--dec-vocab-size", default=40000, type=int, required=False)
 
     args = parser.parse_args()
 
-    vocab_src, vocab_tgt = extract_vocab_from_tsv(args.train)
-    data_train = extract_dataset_from_tsv(args.train, vocab_src, vocab_tgt)
+    random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    if args.gpu > -1:
+        with torch.cuda.device(args.gpu):
+            torch.cuda.manual_seed(args.seed)
+
+    src_field, tgt_field = args.src_tgt_fields
+    vocab, datasets = load_data(
+        args.train, args.valid, src_field=src_field, tgt_field=tgt_field,
+        length_mode=args.length_mode, len_field=args.length_field,
+        enc_vocab_size=args.enc_vocab_size, dec_vocab_size=args.dec_vocab_size)
+
+    data_train, data_valid = datasets
+    src_vocab = vocab[0]
+    tgt_vocab = vocab[1]
 
 
-    enc = RNNEncoder(vocab_src.size, args.embedding_dim)
-    dec = RNNDecoder(vocab_tgt, args.embedding_dim, 
-        attention_mode=args.attention)
+    n_tokens_enc_train = data_train.source.gt(0).sum()
+    n_unk_enc_train = data_train.source.eq(src_vocab.unknown_index).sum()
+    per_unk_enc_train = n_unk_enc_train / n_tokens_enc_train
     
-    model = Seq2SeqModel(enc, dec)
+    n_tokens_dec_train = data_train.target_in.gt(0).sum()
+    n_unk_dec_train = data_train.target_in.eq(tgt_vocab.unknown_index).sum()
+    per_unk_dec_train = n_unk_dec_train / n_tokens_dec_train
 
-    model.train()
+    n_tokens_enc_valid = data_valid.source.gt(0).sum()
+    n_unk_enc_valid = data_valid.source.eq(src_vocab.unknown_index).sum()
+    per_unk_enc_valid = n_unk_enc_valid / n_tokens_enc_valid
+    
+    n_tokens_dec_valid = data_valid.target_in.gt(0).sum()
+    n_unk_dec_valid = data_valid.target_in.eq(tgt_vocab.unknown_index).sum()
+    per_unk_dec_valid = n_unk_dec_valid / n_tokens_dec_valid
 
-    optimizer = torch.optim.Adagrad(model.parameters(), lr=.01)
-    import torch.nn.functional as F
+    print("\nTraining data")
+    print("=============")
+    print("# encoder tokens: {}".format(n_tokens_enc_train))
+    print("% encoder unk tokens: {}".format(per_unk_enc_train))
+    print("# decoder tokens: {}".format(n_tokens_dec_train))
+    print("% decoder unk tokens: {}".format(per_unk_dec_train))
+
+    print("\nValidation data")
+    print("===============")
+    print("# encoder tokens: {}".format(n_tokens_enc_valid))
+    print("% encoder unk tokens: {}".format(per_unk_enc_valid))
+    print("# decoder tokens: {}".format(n_tokens_dec_valid))
+    print("% decoder unk tokens: {}".format(per_unk_dec_valid))
+
+    print("\nbuilding model...")
+
+    print(args.bidirectional == 1)
+    if len(vocab) == 2:
+        vocab_src, vocab_tgt = vocab
+        model = model_builder.seq2seq(
+            vocab_src, vocab_tgt, 
+            rnn_type=args.rnn, num_layers=args.num_layers,
+            bidirectional=args.bidirectional == 1,
+            embedding_dim=args.embedding_dim, hidden_dim=args.hidden_dim,
+            attention_type=args.attention, dropout=args.dropout)
+    else:
+        vocab_src, vocab_tgt, vocab_len = vocab
+        model = model_builder.seq2seq_lt(
+            vocab_src, vocab_tgt, vocab_len,
+            rnn_type=args.rnn, num_layers=args.num_layers,
+            bidirectional=args.bidirectional == 1,
+            embedding_dim=args.embedding_dim, hidden_dim=args.hidden_dim,
+            attention_type=args.attention, dropout=args.dropout,
+            len_embedding_dim=args.len_embedding_dim)
 
 
-    for e in range(15):
-        total_loss = 0
-        steps = 0
-        for batch in data_train.iter_batch():
-            steps += 1
-            optimizer.zero_grad()
 
-            logits = model(batch)
-            logits_flat = logits.view(
-                logits.size(0) * logits.size(1), logits.size(2))
-            
-            tgt_out = batch.target_out
-            tgt_out_flat = tgt_out.t().contiguous().view(
-                tgt_out.size(0) * tgt_out.size(1))        
-            
-            loss = F.cross_entropy(logits_flat, tgt_out_flat, ignore_index=0)
-            total_loss += loss.data[0]
+#    print("reading training data...")
+#    data_train = extract_dataset_from_tsv(args.train, vocab_src, vocab_tgt)
+    data_train.set_batch_size(args.batch_size)
+    data_train.set_gpu(args.gpu)
+#
+#    print("reading validation data...")
+#    data_valid = extract_dataset_from_tsv(args.valid, vocab_src, vocab_tgt)
+    data_valid.set_batch_size(args.batch_size)
+    data_valid.set_gpu(args.gpu)
+#
+#    print("building model...")
+#    model = model_builder.seq2seq(
+#        vocab_src, vocab_tgt, rnn_type=args.rnn, 
+#        embedding_dim=args.embedding_dim, hidden_dim=args.hidden_dim,
+#        attention_type=args.attention, dropout=args.dropout)
 
-            loss.backward()            
-            optimizer.step()
-        print(e, total_loss / steps)        
+    if args.gpu > -1:
+        model = model.cuda(args.gpu)
 
+    if args.optimizer == "sgd":
+        optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
+    elif args.optimizer == "adagrad":
+        optimizer = torch.optim.Adagrad(model.parameters(), lr=args.lr)
+    elif args.optimizer == "adadelta":
+        optimizer = torch.optim.Adadelta(model.parameters(), lr=args.lr)
+    elif args.optimizer == "adam":
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    else:
+        raise Exception("Unkown optimizer: {}".format(args.optimizer))
+
+    trainer.train(model, data_train, data_valid, optimizer, args.epochs,
+        best_model_path=args.save_path)
+    
+    exit()
 
     
     for batch in data_train.iter_batch():
@@ -91,27 +188,4 @@ if __name__ == "__main__":
             print("")
     exit()
 
-
-    for i, batch in enumerate(dataset.batch_iter(batch_size), 1):
-        status_update("train", 100 * i / num_batches, avg_nll, acc)
-       
-        inputs, targets = batch
-        logits = model(inputs, is_train=True)
-        loss = F.cross_entropy(logits, targets) 
-        loss.backward()
-        optimizer.step()
-    
-        #if model.steps == report_step:
-        #    model.print_activation_info()
-        #    report_step *= 2
-
-
-
-        total_inputs += inputs.data.size(0)
-        pred_targets = logits.data.max(1)[1]
-        total_correct += (pred_targets == targets.data).sum()
-        total_nll += loss.data[0] * inputs.data.size(0)
-        avg_nll = total_nll / total_inputs
-        acc = 100 * total_correct / total_inputs
-    status_update("train", 100, avg_nll, acc)
 
