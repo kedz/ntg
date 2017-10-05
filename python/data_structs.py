@@ -296,3 +296,179 @@ class Seq2SeqBatch(object):
     @property
     def target_length(self):
         return self.target_length_
+
+
+
+class Seq2SeqSPDataset(object):
+    def __init__(self, source, source_length, target_in, target_out, 
+                 target_length, target_counts):
+        self.source_ = source
+        self.source_length_ = source_length
+        
+        self.target_in_ = target_in
+        self.target_out_ = target_out
+        self.target_length_ = target_length
+        self.target_counts_ = target_counts
+
+        self.batch_size_ = 2
+        self.chunk_size_ = 10
+
+        self.gpu_ = 0
+
+        self.buf1 = torch.LongTensor()
+        self.buf2 = torch.LongTensor()
+        self.buf3 = torch.LongTensor()
+        self.buf4 = torch.LongTensor()
+        self.buf5 = torch.LongTensor()
+        self.buf6 = torch.FloatTensor()
+
+    def set_gpu(self, gpu):
+        self.gpu_ = gpu
+        if self.gpu_ > -1:
+            with torch.cuda.device(self.gpu_):
+                self.cbuf1 = torch.cuda.LongTensor()
+                self.cbuf2 = torch.cuda.LongTensor()
+                self.cbuf3 = torch.cuda.LongTensor()
+                self.cbuf4 = torch.cuda.LongTensor()
+                self.cbuf5 = torch.cuda.LongTensor()
+                self.cbuf6 = torch.cuda.FloatTensor()
+
+    def set_batch_size(self, batch_size):
+        if not isinstance(batch_size, int) or batch_size < 1:
+            raise Exception("Batch size must be a positive integer.")
+        self.batch_size_ = batch_size
+    
+    @property
+    def source(self):
+        return self.source_
+
+    @property
+    def source_length(self):
+        return self.source_length_
+
+    @property
+    def target_in(self):
+        return self.target_in_
+
+    @property
+    def target_out(self):
+        return self.target_out_
+
+    @property
+    def target_length(self):
+        return self.target_length_
+
+    @property
+    def target_counts(self):
+        return self.target_counts_
+
+    @property
+    def batch_size(self):
+        return self.batch_size_
+
+    def set_batch_size(self, batch_size):
+        self.batch_size_ = batch_size
+    
+    @property
+    def chunk_size(self):
+        return self.chunk_size_
+
+    @property
+    def size(self):
+        return self.source_.size(0)
+
+    def iter_batch(self):
+
+        indices = [i for i in range(self.size)]
+        random.shuffle(indices)
+        indices = torch.LongTensor(indices)
+        
+        for i in range(0, self.size, self.batch_size * self.chunk_size):
+            indices_chunk = indices[i:i + self.batch_size * self.chunk_size]
+            lengths_batch = self.source_length.index_select(0, indices_chunk)
+            sorted, sort_indices = torch.sort(
+                lengths_batch, dim=0, descending=True)
+            indices_sorted_ = indices_chunk.index_select(0, sort_indices)
+            indices[i:i + self.batch_size * self.chunk_size] = indices_sorted_
+
+        for i in range(0, self.size, self.batch_size):
+            indices_batch = indices[i:i + self.batch_size]
+
+            # THIS WONT WORK IF NOT SORTED
+            max_src_len = self.source_length[indices_batch[0]]
+
+            src_b = self.source.index_select(0, indices_batch, out=self.buf1)
+            src_b = src_b[:,:max_src_len]
+            src_len_b = self.source_length.index_select(
+                0, indices_batch, out=self.buf2)
+            tgt_len_b = self.target_length.index_select(
+                0, indices_batch, out=self.buf5)
+            max_tgt_len = torch.max(tgt_len_b)
+
+            tgt_in_b = self.target_in[:,:max_tgt_len].index_select(
+                0, indices_batch, out=self.buf3)
+            tgt_out_b = self.target_out[:,:max_tgt_len].t().index_select(
+                1, indices_batch, out=self.buf4)
+
+            tgt_wc_b = self.target_counts.index_select(
+                0, indices_batch, out=self.buf6)
+
+            if self.gpu_ > -1:
+
+                src_b = self.cbuf1.resize_(src_b.size()).copy_(src_b)
+                src_len_b = self.cbuf2.resize_(src_len_b.size()).copy_(
+                    src_len_b)
+                tgt_in_b = self.cbuf3.resize_(tgt_in_b.size()).copy_(tgt_in_b)
+                tgt_out_b = self.cbuf4.resize_(tgt_out_b.size()).copy_(
+                    tgt_out_b)
+                tgt_len_b = self.cbuf5.resize_(tgt_len_b.size()).copy_(
+                    tgt_len_b)
+                tgt_wc_b = self.cbuf6.resize_(tgt_wc_b.size()).copy_(
+                    tgt_wc_b)
+
+            batch = Seq2SeqSPBatch(
+                src_b, src_len_b, tgt_in_b, tgt_out_b.t(), tgt_len_b, tgt_wc_b)
+            yield batch
+
+class Seq2SeqSPBatch(object):
+    def __init__(self, source, source_length, target_in, target_out, 
+                 target_length, target_counts):
+        self.source_ = Variable(source)
+        self.source_length_ = source_length
+        self.target_in_ = Variable(target_in)
+        self.target_out_ = Variable(target_out)
+        self.target_length_ = target_length
+        self.target_counts_ = Variable(target_counts)
+
+    @property
+    def source(self):
+        return self.source_
+
+    @property
+    def source_length(self):
+        return self.source_length_
+
+    @property
+    def target_in(self):
+        return self.target_in_
+
+    @property
+    def target_out(self):
+        return self.target_out_
+
+    @property
+    def target_length(self):
+        return self.target_length_
+
+    @property
+    def target_counts(self):
+        return self.target_counts_
+
+    @property
+    def target_counts_bin(self):
+        return self.target_counts_.clamp(0,1)
+
+    
+
+
+

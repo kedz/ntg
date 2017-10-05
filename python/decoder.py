@@ -117,14 +117,14 @@ class RNNDecoder(nn.Module):
 
         batch_size = prev_state.size(1)
 
-        target_in = torch.LongTensor()
+        target_in = prev_state.data.new().long()
         target_in.resize_(1, batch_size).fill_(self.start_index)
         target_in = Variable(target_in)
 
-        target_out = torch.LongTensor()
+        target_out = target_in.data.new()
         target_out.resize_(batch_size, max_steps).fill_(0)
 
-        not_stopped = torch.ByteTensor().resize_(batch_size).fill_(1)
+        not_stopped = target_in.data.new().byte().resize_(batch_size).fill_(1)
 
         for i in range(max_steps):
             emb = self.embeddings_(target_in)
@@ -150,7 +150,7 @@ class RNNDecoder(nn.Module):
             not_stopped.mul_(pred_step.data.ne(self.stop_index))
             
             # I can't believe I have to go to numpy for this
-            if ~not_stopped.numpy().any():
+            if (~not_stopped).cpu().numpy().any():
                 target_out = target_out[:,:i+1]
                 break
             
@@ -238,6 +238,75 @@ class RNNLTDecoder(nn.Module):
     @property
     def attention(self):
         return self.attention_module_
+
+    def greedy_predict(self, prev_state, len_token, context=None, 
+                       max_steps=50, test_zero=False):
+
+        batch_size = prev_state.size(1)
+
+        target_in = prev_state.data.new().long()
+        target_in.resize_(1, batch_size).fill_(self.start_index)
+        target_in = Variable(target_in)
+
+        target_out = target_in.data.new()
+        target_out.resize_(batch_size, max_steps).fill_(0)
+
+        not_stopped = target_in.data.new().byte().resize_(batch_size).fill_(1)
+
+        len_emb = self.embeddings_len_(len_token.t())
+        logits_record = target_in.data.new().float().resize_(
+            max_steps, batch_size, self.vocab.size)
+      
+
+        for i in range(max_steps):
+            emb = self.embeddings_(target_in)
+            if test_zero:
+                emb.data.fill_(0)
+            emb = torch.cat([emb, len_emb], 2)
+
+            dec_hidden = self.rnn_(emb, prev_state)[1]
+            #print(dec_hidden)
+            if self.has_attention:
+                weights, attn_context = self.attention(context, dec_hidden)
+                hidden = torch.cat([dec_hidden, attn_context], 2).squeeze(0)
+            else:
+                hidden = dec_hidden.squeeze(0)
+            
+            prev_state = dec_hidden
+
+            logits = self.logits_layer_(hidden)
+            logits_record[i].copy_(logits.data)
+
+            max_val, pred_step = logits.max(1)
+            target_in = pred_step.unsqueeze(0)
+
+            target_out[:,i].copy_(pred_step.data)
+            target_out[:,i].masked_fill_(~not_stopped, 0)
+            
+            not_stopped.mul_(pred_step.data.ne(self.stop_index))
+            
+            # I can't believe I have to go to numpy for this
+            if (~not_stopped).cpu().numpy().any():
+                target_out = target_out[:,:i+1]
+                break
+            
+        logits_record = logits_record[:i+1]
+        
+            
+        return target_out, logits_record
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def forward(self, prev_state, target_in, target_in_lt, target_length, 
                 context=None):

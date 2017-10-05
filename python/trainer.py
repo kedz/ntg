@@ -36,6 +36,61 @@ def _update_progress(step, max_steps, avg_nll):
         sys.stdout.flush()
 
 
+def minimize_criterion(crit, data_train, data_valid, max_epochs,
+                       save_best_model=None, show_progress=True):
+
+    train_scores = []
+    valid_scores = []
+    
+    best_score = float("inf")
+    best_epoch = 0
+
+    for epoch in range(1, max_epochs + 1):
+
+        if show_progress:
+            print("\n === Epoch {} ===".format(epoch))
+        train_obj = train_epoch_(crit, data_train, show_progress=show_progress)
+        valid_obj = eval_(crit, data_valid, show_progress=show_progress)
+
+        if valid_obj < best_score:
+            best_score = valid_obj
+            best_epoch = epoch
+        
+            if save_best_model:
+                print("Writing model to {} ...".format(save_best_model))
+                torch.save(crit.model, save_best_model)
+
+        train_scores.append(train_obj)
+        valid_scores.append(valid_obj)
+
+    return {"valid_nll": valid_scores, "train_nll": train_scores}        
+
+def train_epoch_(crit, dataset, show_progress=True):
+    
+    max_steps = ceil(dataset.size / dataset.batch_size)
+    crit.reset()
+    crit.model.train()
+
+    for step, batch in enumerate(dataset.iter_batch(), 1):
+        crit.minimize(batch)
+        if show_progress:
+            _update_progress(step, max_steps, crit.avg_loss)
+    return crit.avg_loss
+           
+def eval_(crit, dataset, show_progress=True):
+    
+    max_steps = ceil(dataset.size / dataset.batch_size)
+    crit.reset()
+    crit.model.eval()
+
+    for step, batch in enumerate(dataset.iter_batch(), 1):
+        
+        crit.compute_loss(batch)
+        if show_progress:
+            _update_progress(step, max_steps, crit.avg_loss)
+ 
+    return crit.avg_loss
+
 def train(model, data_train, data_valid, optimizer, max_epochs, 
           show_progress=True, best_model_path=None):
 
