@@ -1,5 +1,5 @@
 from text_preprocessor import VocabPreprocessor
-from data_structs import Vocab
+#from data_structs import Vocab
 
 
 def collect_tsv_stats(path, readers, skip_header=True, diagnostics=True):

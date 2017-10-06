@@ -1,12 +1,16 @@
-from models.sequence_model_base import SequenceModelBase
-from decoder import RNNLMDecoder
+from models.sequence_predictor import SequencePredictor
+#from decoder import RNNLMDecoder
 import torch
 import torch.nn as nn
 
-class RNNLM(SequenceModelBase):
+class RNNLM(SequencePredictor):
 
     def __init__(self, rnn_type, vocab, embedding_size, hidden_size, 
                  num_layers, learn_start=True):
+
+        
+        
+        exit()
         super(RNNLM, self).__init__()
         self.rnn_type_ = rnn_type
         self.vocab_ = vocab

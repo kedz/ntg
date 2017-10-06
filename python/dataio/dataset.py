@@ -113,6 +113,12 @@ class Dataset(ABC):
             yield self.get_batch()
                 
 
+#class SequencePredictionDataset(Dataset):
+#    def __init__(self, decoder_inputs, decoder_targets, 
+#                 encoder_inputs=None, decoder_features=None):
+
+
+
 class SequenceClassificationDataset(Dataset):
     def __init__(self, input, input_length, target, **args):
         super(SequenceClassificationDataset, self).__init__(

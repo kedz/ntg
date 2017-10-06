@@ -29,8 +29,11 @@ class AttentionBase(nn.Module):
         output = torch.cat([input, composed_context], 2)
         return output
 
-    def forward(self, input, context):
+    def forward(self, input, context, return_weights=True):
         weights = self.attend(input, context)
         composed_context = self.compose(context, weights)
         output = self.merge(input, composed_context)
-        return output, weights
+        if return_weights:
+            return output, weights
+        else:
+            return output

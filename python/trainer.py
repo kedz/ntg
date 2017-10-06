@@ -10,6 +10,21 @@ FINISH_TEMPLATE = "{} / {} steps ({:0.3f}%) | {:0.3f}ms/stp |" \
     " elapsed {:0.3f}min | avg. nll {:0.3f}\n"
 START_TIME = 0
 
+
+def optimizer_from_args(args, parameters):
+    if args.optimizer == "sgd":
+        optimizer = torch.optim.SGD(parameters, lr=args.lr)
+    elif args.optimizer == "adagrad":
+        optimizer = torch.optim.Adagrad(parameters, lr=args.lr)
+    elif args.optimizer == "adadelta":
+        optimizer = torch.optim.Adadelta(parameters, lr=args.lr)
+    elif args.optimizer == "adam":
+        optimizer = torch.optim.Adam(parameters, lr=args.lr)
+    else:
+        raise Exception("Unkown optimizer: {}".format(args.optimizer))
+    return optimizer
+
+
 def _update_progress(step, max_steps, avg_nll):
 
     if step == 1:
@@ -49,8 +64,14 @@ def minimize_criterion(crit, data_train, data_valid, max_epochs,
 
         if show_progress:
             print("\n === Epoch {} ===".format(epoch))
+
+        print("train split ...")
         train_obj = train_epoch_(crit, data_train, show_progress=show_progress)
+        print(crit.status_msg())
+
+        print("valid split ...")
         valid_obj = eval_(crit, data_valid, show_progress=show_progress)
+        print(crit.status_msg())
 
         if valid_obj < best_score:
             best_score = valid_obj

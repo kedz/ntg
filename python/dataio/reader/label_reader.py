@@ -1,5 +1,5 @@
 import torch
-from reader.reader_base import ReaderBase
+from dataio.reader.reader_base import ReaderBase
 from preprocessor import SimplePreprocessor
 from vocab import Vocab
 

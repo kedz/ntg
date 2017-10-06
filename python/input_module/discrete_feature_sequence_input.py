@@ -49,6 +49,9 @@ class DiscreteFeatureSequenceInput(nn.Module):
 
     def forward(self, inputs, input_length=None, transpose=True):
 
+        if not isinstance(inputs, (list, tuple)):
+            inputs = [inputs]
+
         embedded_inputs = []
         for input, lookup in zip(inputs, self.embedding_modules):
             if transpose:
