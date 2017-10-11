@@ -2,7 +2,7 @@ import argparse
 import os
 import json
 
-import dataio
+from dataio.reader import DiscreteSequenceReader
 from dataio.recipes import read_sequence_data
 import input_module
 import models
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     # This reader also does minimal preprocessing by default, i.e. lowercasing
     # tokens, replacing digits with D, and replacing rare words with the 
     # unknown token.
-    input_reader = dataio.reader.DiscreteSequenceReader(
+    input_reader = DiscreteSequenceReader(
         field=args.input_field,
         top_k=args.vocab_size, at_least=args.vocab_min_count,
         lowercase=args.vocab_lower, left_pad=args.start_pad, 
