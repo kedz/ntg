@@ -9,6 +9,13 @@ import numpy as np
 # TODO implement greedy predict
 
 class SequencePredictor(ModelBase):
+    '''
+    Base class for implementing language models and seq2seq models.
+    Wraps a decoder and input modules and handles bookkeeping for
+    beam search and greedy decoding during prediction time.
+    '''
+
+
     def __init__(self, input_modules, decoder):
         super(SequencePredictor, self).__init__()
         self.input_modules_ = input_modules
