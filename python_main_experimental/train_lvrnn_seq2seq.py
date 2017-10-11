@@ -2,7 +2,7 @@ import os
 import argparse
 import json
 
-from dataio.reader import DiscreteSequenceReader
+from dataio.reader import DiscreteSequenceReader, DiscreteFeatureReader
 from dataio.recipes import read_sequence_data
 import input_module
 import models
