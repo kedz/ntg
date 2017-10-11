@@ -1,6 +1,36 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
+
+def from_args(args, rnn_hidden_size=None, num_layers=None, bidirectional=None,
+              bridge_type=None):
+
+    if bidirectional is None:
+        bidirectional = args.bidirectional
+
+    if rnn_hidden_size is None:
+        rnn_hidden_size = args.rnn_hidden_size
+
+    if num_layers is None:
+        num_layers = args.num_layers
+
+    if bridge_type is None:
+        bridge_type = args.bridge_type
+        
+    if bidirectional:
+        if bridge_type.startswith("linear-"):
+            act_type = bridge_type.split("-")[1]
+            return FullyConnectedBridge(
+                rnn_hidden_size, num_layers, 
+                activation=act_type, bidirectional_input=True)
+        elif bridge_type == "average":
+            return AveragingBridge(num_layers)
+        else:
+            raise Exception(
+                "bridge_type {} not valid.".format(bridge_type))
+    else:
+        return NoOpBridge()
+
 class FullyConnectedBridge(nn.Module):
 
     def __init__(self, state_size, num_layers, bidirectional_input=True, 
@@ -37,11 +67,7 @@ class FullyConnectedBridge(nn.Module):
         return output.permute(2,0,1).contiguous()
 
     def forward(self, input):
-        # lstm state is a tuple of tensors.
-        if isinstance(input, (tuple, list)):
-            return tuple([self.transform_state(state) for state in input])
-        else:
-            return self.transform_state(input)
+        return self.transform_state(input)
 
 class AveragingBridge(nn.Module):
     def __init__(self, num_layers):

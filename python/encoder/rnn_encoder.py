@@ -2,80 +2,105 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class RNNEncoder(nn.Module):
 
-    def __init__(self, input_module, rnn_type, hidden_size, 
-                 num_layers, bidirectional=True):
+    @classmethod
+    def from_args(cls, args, encoder_input_size=None, dropout=None,
+                  rnn_type=None, rnn_hidden_size=None, num_layers=None,
+                  bidirectional=None):
 
-        super(RNNEncoder, self).__init__()
+        if num_layers is None:
+            num_layers = args.num_layers
 
-        self.input_module_ = input_module
-        self.rnn_type_ = rnn_type
-        self.hidden_size_ = hidden_size
-        self.num_layers_ = num_layers
-        self.bidirectional_ = bidirectional
+        if encoder_input_size is None:
+            encoder_input_size = args.encoder_input_size
 
-        self.reset_module()
+        if rnn_hidden_size is None:
+            rnn_hidden_size = args.rnn_hidden_size
 
-    def reset_module(self):
+        if dropout is None:
+            dropout = args.dropout
 
-        rnn_args = {"num_layers": self.num_layers, 
-                    "bidirectional": self.bidirectional}    
-        if self.rnn_type == "rnn":
+        if rnn_type is None:
+            rnn_type = args.rnn_type
+
+        if bidirectional is None:
+            bidirectional = args.bidirectional
+
+        rnn_args = {"num_layers": num_layers, 
+                    "bidirectional": bidirectional,
+                    "dropout": dropout}
+        
+        layers_x_dir = num_layers * 2 if bidirectional else num_layers
+
+        if rnn_type == "rnn":
             rnn_init = nn.RNN
             rnn_args["nonlinearity"] = "relu"
-        elif self.rnn_type == "gru":
+            rnn_state_dims = ((layers_x_dir, 1, rnn_hidden_size),)
+        elif rnn_type == "gru":
             rnn_init = nn.GRU
-        elif self.rnn_type == "lstm":
+            rnn_state_dims = ((layers_x_dir, 1, rnn_hidden_size),)
+        elif rnn_type == "lstm":
             rnn_init = nn.LSTM 
+            rnn_state_dims = ((layers_x_dir, 1, rnn_hidden_size),) * 2
         else:
             raise Exception("rnn_type {} not supported".format(rnn_type))
 
-        self.rnn_ = rnn_init(self.embedding_size, self.hidden_size, **rnn_args)
+        rnn_module = rnn_init(
+            encoder_input_size, rnn_hidden_size, **rnn_args)
+        return cls(rnn_module, bidirectional_merge_mode="average",
+                   rnn_state_dims=rnn_state_dims)
+
+
+    def __init__(self, rnn_module, bidirectional_merge_mode=None, 
+                 rnn_state_dims=None):
+
+        super(RNNEncoder, self).__init__()
+
+        self.rnn_module_ = rnn_module
+        
+        self.bidirectional_merge_mode_ = bidirectional_merge_mode
+        if bidirectional_merge_mode not in ["average", None]:
+            raise Exception(
+                "bidirectional_merge_mode {} not supported.".format(
+                    bidirectional_merge_mode))
+        
+        if rnn_state_dims is None:
+            rnn_state_dims = ()
+        self.rnn_state_dims_ = rnn_state_dims
 
     @property
-    def input_module(self):
-        return self.input_module_
+    def bidirectional_merge_mode(self):
+        return self.bidirectional_merge_mode_
 
     @property
-    def vocab_size(self):
-        return self.input_module.vocab_size
+    def rnn_state_dims(self):
+        return self.rnn_state_dims_
 
     @property
-    def embedding_size(self):
-        return self.input_module.embedding_size
-
-    @property
-    def rnn_type(self):
-        return self.rnn_type_
-
-    @property
-    def hidden_size(self):
-        return self.hidden_size_
-
-    @property
-    def num_layers(self):
-        return self.num_layers_
-
-    @property
-    def bidirectional(self):
-        return self.bidirectional_
+    def rnn_module(self):
+        return self.rnn_module_
 
     def average_bidirectional_output(self, output):
         max_steps = output.size(0)
         batch_size = output.size(1)
-        output4d = output.view(max_steps, batch_size, 2, self.hidden_size)
+        hidden_size = output.size(2) // 2
+        output4d = output.view(max_steps, batch_size, 2, hidden_size)
         output_mean = output4d.mean(2)
         return output_mean
 
-    def forward(self, inputs, input_length, init_state=None):
+    def forward(self, input, input_length, prev_state=None):
+
+        input_packed = nn.utils.rnn.pack_padded_sequence(
+            input, input_length.data.tolist(), batch_first=False)
+
+        output_packed, state = self.rnn_module(input_packed, prev_state)
         
-        input_sequence = self.input_module(inputs, input_length=input_length)
-        output_packed, state = self.rnn_(input_sequence, init_state)
         output, _ = nn.utils.rnn.pad_packed_sequence(
             output_packed, batch_first=False)
-
-        if self.bidirectional:
+        
+        if self.bidirectional_merge_mode == "average":
             output = self.average_bidirectional_output(output)
 
         return output, state

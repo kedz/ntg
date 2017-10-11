@@ -1,11 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from decoder.decoder_base import DecoderBase
 import attention
 
 
-class RNNDecoder(DecoderBase):
+class RNNDecoder(nn.Module):
 
     @classmethod
     def from_args(cls, args, decoder_input_size=None, dropout=None, 
@@ -115,19 +114,4 @@ class RNNDecoder(DecoderBase):
 
         logits_flat = self.predictor_module(attention_output_flat)
         logits = logits_flat.view(max_steps, batch_size, logits_flat.size(1))
-        return logits
-
-#    def greedy_predict(self, init_state, context):
-#        pass
-#
-#    def forward_step(self, inputs, prev_state=None, context=None):
-#
-#        input_sequence = self.input_module(inputs)
-#        rnn_output, rnn_state = self.rnn_module(input_sequence, prev_state)
-#        attention_output, weights = self.attention_module(
-#            rnn_output, context=context)
-#        logits = self.predictor_module(attention_output[0])
-#        return logits, weights, rnn_state
-
-
-
+        return logits, rnn_state
