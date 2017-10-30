@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class DiscreteSequence(nn.Module):
@@ -25,6 +26,9 @@ class DiscreteSequence(nn.Module):
     @property
     def dropout(self):
         return self.dropout_
+
+    def set_dropout(self, dropout):
+        self.dropout_ = dropout
 
     @property
     def embedding_lookup(self):

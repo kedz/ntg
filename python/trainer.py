@@ -5,21 +5,25 @@ import torch
 import torch.nn.functional as F
 
 UPDATE_TEMPLATE = "{} / {} steps ({:0.3f}%) | {:0.3f}ms/stp | eta {:0.3f}min" \
-    " | avg. nll {:0.3f}"
+    " | obj. {:0.3f}"
 FINISH_TEMPLATE = "{} / {} steps ({:0.3f}%) | {:0.3f}ms/stp |" \
-    " elapsed {:0.3f}min | avg. nll {:0.3f}\n"
+    " elapsed {:0.3f}min | obj. {:0.3f}\n"
 START_TIME = 0
 
 
 def optimizer_from_args(args, parameters):
     if args.optimizer == "sgd":
-        optimizer = torch.optim.SGD(parameters, lr=args.lr)
+        optimizer = torch.optim.SGD(
+            parameters, lr=args.lr, weight_decay=args.l2_penalty)
     elif args.optimizer == "adagrad":
-        optimizer = torch.optim.Adagrad(parameters, lr=args.lr)
+        optimizer = torch.optim.Adagrad(
+            parameters, lr=args.lr, weight_decay=args.l2_penalty)
     elif args.optimizer == "adadelta":
-        optimizer = torch.optim.Adadelta(parameters, lr=args.lr)
+        optimizer = torch.optim.Adadelta(
+            parameters, lr=args.lr, weight_decay=args.l2_penalty)
     elif args.optimizer == "adam":
-        optimizer = torch.optim.Adam(parameters, lr=args.lr)
+        optimizer = torch.optim.Adam(
+            parameters, lr=args.lr, weight_decay=args.l2_penalty)
     else:
         raise Exception("Unkown optimizer: {}".format(args.optimizer))
     return optimizer
@@ -52,12 +56,15 @@ def _update_progress(step, max_steps, avg_nll):
 
 
 def minimize_criterion(crit, data_train, data_valid, max_epochs,
-                       save_best_model=None, show_progress=True):
+                       save_best_model=None, show_progress=True, 
+                       low_score=True):
 
-    train_scores = []
-    valid_scores = []
+    result_data = {"training": [], "validation": []}
     
-    best_score = float("inf")
+    if low_score:
+        best_score = float("inf")
+    else:
+        best_score = float("-inf")
     best_epoch = 0
 
     for epoch in range(1, max_epochs + 1):
@@ -68,12 +75,15 @@ def minimize_criterion(crit, data_train, data_valid, max_epochs,
         print("train split ...")
         train_obj = train_epoch_(crit, data_train, show_progress=show_progress)
         print(crit.status_msg())
+        result_data["training"].append(crit.result_dict())
 
         print("valid split ...")
         valid_obj = eval_(crit, data_valid, show_progress=show_progress)
         print(crit.status_msg())
-
-        if valid_obj < best_score:
+        result_data["validation"].append(crit.result_dict())
+        
+        if (low_score and (valid_obj < best_score)) or \
+                ((not low_score) and (valid_obj > best_score)):
             best_score = valid_obj
             best_epoch = epoch
         
@@ -81,16 +91,14 @@ def minimize_criterion(crit, data_train, data_valid, max_epochs,
                 print("Writing model to {} ...".format(save_best_model))
                 torch.save(crit.model, save_best_model)
 
-        train_scores.append(train_obj)
-        valid_scores.append(valid_obj)
-
-    return {"valid_nll": valid_scores, "train_nll": train_scores}        
+    return result_data
 
 def train_epoch_(crit, dataset, show_progress=True):
     
     max_steps = ceil(dataset.size / dataset.batch_size)
     crit.reset()
     crit.model.train()
+    print(crit.model.mlp.training)
 
     for step, batch in enumerate(dataset.iter_batch(), 1):
         crit.minimize(batch)
@@ -103,6 +111,7 @@ def eval_(crit, dataset, show_progress=True):
     max_steps = ceil(dataset.size / dataset.batch_size)
     crit.reset()
     crit.model.eval()
+    print(crit.model.mlp.training)
 
     for step, batch in enumerate(dataset.iter_batch(), 1):
         

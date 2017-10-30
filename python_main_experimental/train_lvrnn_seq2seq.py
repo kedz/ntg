@@ -12,6 +12,11 @@ import trainer
 import random
 import torch
 
+def validate_directory(path):
+    path_dir = os.path.dirname(path)
+    if path_dir != "" and not os.path.exists(path_dir):
+        os.makedirs(path_dir)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Train an lvrnn seq2seq model.")
@@ -59,6 +64,8 @@ if __name__ == "__main__":
         "--dropout", default=0.0, required=False, type=float)
     parser.add_argument(
         "--input-dropout", default=0.0, required=False, type=float)
+    parser.add_argument(
+        "--l2-penalty", default=0.0, required=False, type=float)
 
     parser.add_argument(
         "--source-field", required=False, default=0, type=int)
@@ -103,6 +110,12 @@ if __name__ == "__main__":
         "--missing-feature-value", type=str, required=False, default="MISSING")
 
     args = parser.parse_args()
+
+    if args.save_model:
+        validate_directory(args.save_model)
+    if args.save_results:
+        validate_directory(args.save_results)
+
 
     random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -187,6 +200,7 @@ if __name__ == "__main__":
     model.set_meta("model_type", "rnnseq2seq")
     model.set_meta("source_reader", source_reader)
     model.set_meta("target_reader", target_reader)
+    model.set_meta("feature_readers", feature_readers)
 
     if args.gpu > -1:
         model = model.cuda(args.gpu)
@@ -200,8 +214,8 @@ if __name__ == "__main__":
         crit, data_train, data_valid, args.epochs,
         save_best_model=args.save_model)
 
-    best_valid_loss = min(results["valid_nll"])
-    best_epoch = results["valid_nll"].index(best_valid_loss) + 1
+    best_valid_loss = min(results["valid_obj"])
+    best_epoch = results["valid_obj"].index(best_valid_loss) + 1
 
     print("\nBest epoch: {}".format(best_epoch))
     print("Best validation nll: {}".format(best_valid_loss))

@@ -44,3 +44,7 @@ class InputGroup(nn.Module):
     @property
     def embedding_size(self):
         return self.embedding_size_
+
+    def set_dropout(self, dropout):
+        for module in self.input_modules:
+            module.set_dropout(dropout)

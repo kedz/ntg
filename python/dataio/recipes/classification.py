@@ -1,9 +1,9 @@
 import dataio.tsv_reader
-from dataio.dataset import SequenceClassificationDataset
+from dataset import SequenceClassificationDataset
 
-def read_sequence_label_data(path, sequence_reader, label_reader, 
-                             skip_header=True, collect_stats=True,
-                             batch_size=1, gpu=-1):
+def read_labeled_sequence_data(path, sequence_reader, label_reader, 
+                               skip_header=True, collect_stats=True,
+                               batch_size=1, gpu=-1):
 
     readers = [sequence_reader, label_reader]
 
@@ -19,4 +19,4 @@ def read_sequence_label_data(path, sequence_reader, label_reader,
     target, = data[1]
 
     return SequenceClassificationDataset(
-        input, input_length, target, batch_size=batch_size, gpu=gpu)
+        [input], input_length, [target], batch_size=batch_size, gpu=gpu)

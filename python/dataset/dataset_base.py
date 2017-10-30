@@ -44,7 +44,6 @@ class Dataset(ABC):
             for cpu_buffer, name in zip(self.cpu_buffers, self.name_):
                 self.gpu_buffers_.append(cpu_buffer.new().cuda(self.gpu_))
                 self.name2gpu_buffer_[name] = self.gpu_buffers_[-1]
-            self.set_batch_buffers()
         self.set_batch_buffers()
 
     def set_batch_size(self, batch_size):

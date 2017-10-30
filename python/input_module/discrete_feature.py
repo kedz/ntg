@@ -26,6 +26,9 @@ class DiscreteFeature(nn.Module):
     def dropout(self):
         return self.dropout_
 
+    def set_dropout(self, dropout):
+        self.dropout_ = dropout
+
     @property
     def embedding_lookup(self):
         return self.embedding_lookup_
@@ -38,3 +41,12 @@ class DiscreteFeature(nn.Module):
             emb_seq = F.dropout(
                 emb_seq, p=self.dropout, training=self.training, inplace=True)
         return emb_seq
+
+    def forward_step(self, input, step):
+        emb = self.embedding_lookup(input.view(1, input.size(0)))
+        if self.dropout > 0:
+            emb = F.dropout(
+                emb, p=self.dropout, training=self.training, inplace=True)
+        return emb
+
+           

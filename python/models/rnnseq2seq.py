@@ -118,4 +118,114 @@ class RNNSeq2Seq(SequencePredictor):
         
         return logits
 
-       
+
+    def init_beam_rnn_state(self, state, beam_size):
+        
+        if isinstance(state, type(None)):
+            return None
+        elif isinstance(state, (tuple, list)):
+            return (self.init_beam_rnn_state(state_i, beam_size) 
+                    for state_i in state)
+        else:
+            num_layers = state.size(0)
+            batch_size = state.size(1)
+            hidden_size = state.size(2)
+            return state.contiguous().repeat(1, 1, beam_size).view(
+                num_layers, batch_size * beam_size, hidden_size)
+
+    def init_beam_context(self, context, beam_size):
+        steps = context.size(0)
+        batch_size = context.size(1)
+        hidden_size = context.size(2)
+        beam_context = context.repeat(1, 1, beam_size).view(
+            steps, batch_size * beam_size, hidden_size)
+        return beam_context
+
+
+    def update_beam_state(self, state, source):
+        if isinstance(state, type(None)):
+            return None
+        elif isinstance(state, (tuple, list)):
+            return (self.update_beam_state(state_i, source)
+                    for state_i in state)
+        else:
+            next_state = state.data.new(state.size())
+            i = 0
+            for batch in range(source.size(0)):
+                for beam in range(source.size(1)):
+                    loc = batch * source.size(1) + source[batch, beam]
+                    next_state[:,i,:].copy_(state.data[:, loc])
+                    i += 1
+            return Variable(next_state)
+
+
+
+    def complete_sequence(self, encoder_inputs, encoder_length, 
+                          decoder_inputs, decoder_features, 
+                          max_steps=100, beam_size=8):
+         
+        batch_size = encoder_inputs[0].size(0)
+        encoder_max_steps = encoder_inputs[0].size(1)
+        prefix_size = decoder_inputs[0].size(1) - 1  
+
+        init_state = self.get_init_state(batch_size)
+
+        encoder_inputs = self.encoder_input_modules.forward_sequence(
+            encoder_inputs, encoder_max_steps)
+
+        context, encoder_state = self.encoder(
+            encoder_inputs, encoder_length, prev_state=init_state)
+
+        
+        decoder_state = self.bridge(encoder_state)
+        
+        if prefix_size > 0:
+            prefix_inputs = []
+            prev_outputs = []
+            for input in decoder_inputs + decoder_features:
+                if input.dim() == 1:
+                    prefix_inputs.append(input)
+                    prev_outputs.append(input)
+                elif input.dim() == 2:
+                    prefix_inputs.append(input[:,:-1])
+                    prev_outputs.append(input[:,-1])
+                else:
+                    raise Exception(
+                        "I don't know what to do with " \
+                        "input with dims = {}".format(input.dim()))
+            prefix_logits, decoder_state = super(RNNSeq2Seq, self).forward(
+                prefix_inputs, prefix_inputs[0].size(1), 
+                prev_state=decoder_state,
+                context=context)
+
+        else: 
+            prev_outputs = []
+            for input in decoder_inputs + decoder_features:
+                if input.dim() == 1:
+                    prev_outputs.append(input)
+                elif input.dim() == 2:
+                    prev_outputs.append(input[:,-1])
+                else:
+                    raise Exception(
+                        "I don't know what to do with " \
+                        "input with dims = {}".format(input.dim()))
+
+
+        # This getter is a BAD idea.
+        Warning("Fix stop getter you dumb dumb.")
+        stop_index = self.get_meta("target_reader").vocab.index("_DSTOP_")
+
+        beam_prev_outputs = self.init_beam_outputs(prev_outputs, beam_size)
+        beam_rnn_state = self.init_beam_rnn_state(decoder_state, beam_size)
+        beam_context = self.init_beam_context(context, beam_size)
+
+        beam_scores = decoder_inputs[0].data.new(
+            batch_size, beam_size).float()
+        beam_scores.fill_(float("-inf"))            
+        for batch in range(batch_size):
+            beam_scores[batch, 0] = 0
+
+        return self.beam_search(
+            beam_prev_outputs, prev_state=beam_rnn_state, scores=beam_scores,
+            max_steps=max_steps, beam_size=beam_size, batch_size=batch_size,
+            stop_index=stop_index, context=beam_context)

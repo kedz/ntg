@@ -13,6 +13,10 @@ class LabelReader(ReaderBase):
 
         self.register_data("data_")
         
+    @property
+    def labels(self):
+        return [self.vocab.token(idx) for idx in range(self.vocab.size)]
+
     def process(self, string):
         string = self.preprocess(string)
         return self.vocab.index(string)

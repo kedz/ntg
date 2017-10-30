@@ -82,6 +82,10 @@ class RNNEncoder(nn.Module):
     def rnn_module(self):
         return self.rnn_module_
 
+    def set_dropout(self, dropout):
+        self.rnn_module.dropout = dropout
+
+
     def average_bidirectional_output(self, output):
         max_steps = output.size(0)
         batch_size = output.size(1)

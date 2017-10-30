@@ -4,10 +4,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class MLP(nn.Module):
-    def __init__(self, input_size, output_size, 
+    def __init__(self, input_size, output_size, dropout=0.0,
                  layer_sizes=None, layer_activations=None):
         super(MLP, self).__init__()
 
+        self.dropout_ = dropout
         self.input_size_ = input_size
         self.output_size_ = output_size
 
@@ -37,10 +38,23 @@ class MLP(nn.Module):
         self.inner_activations_ = activations
         self.final_layer_ = nn.Linear(input_size, self.output_size)
 
+    @property
+    def dropout(self):
+        return self.dropout_
+
     def forward(self, input):
         hidden = input
+
+        if self.dropout > 0:
+            hidden = F.dropout(hidden, p=self.dropout, training=self.training)
+
         for linear, act in zip(self.inner_layers, self.inner_activations_):
             hidden = act(linear(hidden))
+            if self.dropout > 0:
+                hidden = F.dropout(
+                    hidden, p=self.dropout, training=self.training, 
+                    inplace=True)
+
         output = self.final_layer(hidden)
         return output
 
