@@ -34,7 +34,13 @@ class SalienceFunction(nn.Module):
         # for now we have used RELU but it can be generalized
         # returns the Salience energy for all documents in the batch.
         _sz = inputs.size()
-        return targets * F.relu(self.linear(inputs).view(_sz[0], _sz[1]))
+        enery_functional = F.tanh(self.linear(inputs))
+        sentwise_salience = targets * enery_functional.squeeze(2)
+        return sentwise_salience
+        
+
+                #.view(_sz[0], _sz[1]))
+        #return targets * 
 
 class DocumentCentrality(nn.Module):
 
@@ -140,13 +146,15 @@ class EnergySummarizer(nn.Module):
         '''
         super(EnergySummarizer, self).__init__()
         self.kwargs = kwargs
-        self.params = []
-        self.initialize_predicted_labels()
+        #self.params = []
+        #self.initialize_predicted_labels()
         self.salience_func = SalienceFunction(kwargs.input_size)
-        for param in self.salience_func.parameters():
-            if not isinstance(param, Variable):
-                print (param)
-            self.params.append(param)
+        self.neg_salience_func = SalienceFunction(kwargs.input_size)
+        self.lambda1 = Parameter(torch.ones(1)).cuda()
+        #for param in self.salience_func.parameters():
+        #    if not isinstance(param, Variable):
+        #        print (param)
+         #   self.params.append(param)
         # self.document_centrality_func = DocumentCentrality(kwargs.input_size)
 #         for param in self.document_centrality_func.parameters():
 #             if not isinstance(param, Variable):
@@ -157,34 +165,51 @@ class EnergySummarizer(nn.Module):
         # self.opt_loss = optim.SGD([self.salience_func.parameters(), self.document_centrality_func.parameters()], lr = kwargs.learning_rate)
 #
 #
-        self.opt_loss = optim.SGD(self.params, lr = kwargs.learning_rate)
+        self.opt_loss = optim.SGD(self.parameters(), lr = kwargs.learning_rate)
 
     def initialize_predicted_labels(self):
+        print("INIT_PRED_LABELS")
         # predicted labels: (batch_size, n_sentences)
-        self.predicted_labels = Variable(0.5 * torch.ones(self.kwargs.batch_size, self.kwargs.n_sentences).type(dtype), requires_grad = True)
+        self.predicted_labels = Parameter(0.5 + 100 * torch.normal(self.kwargs.batch_size, self.kwargs.n_sentences).type(dtype))
+        self.predicted_labels.data.clamp_(min=0, max=1)
         self.opt_plabels = optim.SGD([self.predicted_labels], lr = self.kwargs.prediction_learning_rate)
+        print("LEAVING INIT_PRED_LABELS")
 
     # TODO: make the loss different for train and test
     def fit_predicted_labels(self, inputs):
         iter = 0
         while iter < self.kwargs.iterations:
             self.opt_plabels.zero_grad()
-            p_energy = self.compute_energy(inputs, self.predicted_labels)
-            total_p_energy = torch.sum(p_energy)
-            total_p_energy.backward()
+            p_energy_sentwise = self.compute_energy(inputs, self.predicted_labels)
+            p_energy = p_energy_sentwise.sum(1)
+            total_p_energy = torch.mean(p_energy) 
+            penalty = 20.5 * self.predicted_labels.norm(1)
+            loss = total_p_energy + penalty
+            #print("search", total_p_energy.data[0])
+            #print(penalty.data[0])
+            loss.backward()
             self.opt_plabels.step()
             # clip the labels between [0,1]
-            self.predicted_labels = torch.clamp(self.predicted_labels, min = 0.0, max = 1.0)
+            self.predicted_labels.data.clamp_(min = 0.0, max = 1.0)
             iter += 1
+
 
     def round_predicted_labels(self):
         # round off the labels so that they are either 0 or 1.
-        self.predicted_labels = torch.round(self.predicted_labels)
+        self.predicted_labels.data.round_()
 
     def compute_energy(self, inputs, targets):
         salience_energy = self.salience_func(inputs, targets)
-        total_energy = salience_energy
+        #neg_salience_energy = self.neg_salience_func(inputs, 1 - targets)
+        total_energy = salience_energy #+ self.lambda1 * neg_salience_energy
         return total_energy
+
+    def energy(self, inputs, targets):
+        val = self.salience_func(inputs, targets).sum(1) #+ self.lambda1 * self.neg_salience_func(inputs, 1 - targets).sum(1)
+        
+        return val
+
+
 
     def compute_loss(self, p_labels, g_labels, p_energy, g_energy):
 
@@ -203,12 +228,27 @@ class EnergySummarizer(nn.Module):
         targets: (batch_size, n_sentences)
         This method does computation per batch per epoch
         '''
+
+        #salience = self.salience_func(inputs, targets)
+
+        #loss = salience.sum()
+        #return loss
+
         # re-initialize the predicted labels
-        self.initialize_predicted_labels()
+
+        self.predicted_labels = Parameter(0.5 + torch.ones(inputs.size(0), inputs.size(1)).normal_().type(dtype))
+        self.predicted_labels.data.clamp_(min=0, max=1)
+        self.opt_plabels = optim.SGD([self.predicted_labels], lr = self.kwargs.prediction_learning_rate)
+
+
+
+        #print("I AM HERE")
+        #self.initialize_predicted_labels()
+
         # fit the predicted labels
         self.fit_predicted_labels(inputs)
         # round off the predicted labels
-        self.round_predicted_labels()
+        #self.round_predicted_labels()
         # compute predicted energies
         p_energy = self.compute_energy(inputs, self.predicted_labels)
         # compute gold energies
@@ -230,41 +270,69 @@ def fit(model, data_loader):
     tp_fp = 0
     tp_fn = 0
 
+    num_selected = 0
+    total_sentences = 0 
+
     for batch_num, batch in enumerate(data_loader.iter_batch()):
         # print("Batch {}".format(batch_num))
         # At this point
         # data: (batch_size, n_sentences, embedding_dimension)
         # target: (batch_size, n_sentences)
-        target = batch.targets.data.type(torch.FloatTensor)
-        data = batch.inputs.data
-
+        
         # update n_sentence length for each batch
-        model.kwargs.n_sentences = data.size()[1]
+        
+        model.kwargs.batch_size = batch.inputs.size(0)
+        model.kwargs.n_sentences = batch.inputs.size(1)
+
 
         model.opt_loss.zero_grad()
+        
 
-        data, target = get_variables(data, target)
 
-        loss, p_energy, g_energy = model(data, target)
+
+        #data, target = get_variables(data, target)
+
+        loss, p_energy, g_energy = model(batch.inputs, batch.targets.float())
+        #print("hinge", loss.data[0], p_energy.data[0], g_energy.data[0])
+        #loss = model(batch.inputs, batch.targets.float())
 
         loss.backward()
 
         model.opt_loss.step()
 
+        #print(loss)
+
+        disc_pred_labels = model.predicted_labels.data.clamp(min=0, max=1).round()
+        #print(disc_pred_labels) 
+        #print(batch.targets.data.float())
+
+        
+
+        # TODO track avg number of predicted 1s 
         # update tp, tp_fp, tp_fn
         # cuda variable to numpy array: (Variable(x).data).cpu().numpy()
-        tp += torch.sum(model.predicted_labels.data * target.data)
-        tp_fp += torch.sum(model.predicted_labels.data)
-        tp_fn += torch.sum(target.data)
+        tp += torch.sum(disc_pred_labels * batch.targets.data.float())
+        tp_fp += torch.sum(disc_pred_labels)
+        tp_fn += torch.sum(batch.targets.data.float())
 
+        num_selected += disc_pred_labels.sum()
+        total_sentences += disc_pred_labels.size(1)
         train_loss += loss.data[0]
         t_p_energy += p_energy.data[0]
         t_g_energy += g_energy.data[0]
+        
 
-    precision = float(tp) / tp_fp
-    recall = float(tp) / tp_fn
+
+
+#    exit()
+    
+    selection_density = num_selected / total_sentences
+    print("density", selection_density, "({} / {})".format(num_selected, total_sentences))
+    precision = float(tp) / tp_fp if tp_fp > 0 else 0
+    recall = float(tp) / tp_fn 
     f1 = (2 * recall * precision) / (recall + precision)
-
+    #print(precision, recall, f1)
+#
     return train_loss, t_p_energy, t_g_energy, precision, recall, f1
 
 def read_data():
@@ -278,18 +346,18 @@ def main(args):
     '''
 
     # batch size is multiple of sentences_per_document
-    batch_size = 2
+    batch_size = 1
 
     reader = MDSEmbeddingReader()
     data_loader = read_mds_embedding_data(
-        args['train_file'], reader, batch_size = batch_size, gpu = -1)
+        args['train_file'], reader, batch_size = batch_size, gpu = 0)
 
     print (args)
 
     # TODO: define the hyper parameters here
-    args['batch_size'] = batch_size
+    # args['batch_size'] = batch_size # dont do that
     args['n_sentences'] = -1  # We are going to change this for each batch so it does not matter whatever value we assign here.
-    args['iterations'] = 30  # number of iterations for fitting predicted labels
+    args['iterations'] = 50  # number of iterations for fitting predicted labels
     args['input_size'] = 300  # sentence embedding dimension
 
 #     print(type(args))
@@ -304,14 +372,31 @@ def main(args):
 #     print (kwargs.input_size)
 
     summarizer = EnergySummarizer(kwargs)
+    
     # TODO: add a flag to use or not use CUDA
     summarizer = summarizer.cuda()
 
     train_losses = []
 
+
+    optimizer = optim.Adam(summarizer.parameters(), lr=.0001)
+
+    for pretraining_epoch in range(100):
+        print("pretraining epoch:", pretraining_epoch)
+        for batch in data_loader.iter_batch():
+            optimizer.zero_grad()
+            total_energy = summarizer.energy(batch.inputs, batch.targets.float())
+            avg_energy = total_energy.mean()
+            print(avg_energy.data[0])
+            avg_energy.backward()
+            optimizer.step()
+
+    summarizer.opt_loss = optim.Adam(summarizer.parameters(), lr = kwargs.learning_rate)
     for epoch in range(1, args['n_epochs'] + 1):
         epoch_start_time = time.time()
+        
         train_loss, p_energy, g_energy, precision, recall, f1 = fit(summarizer, data_loader)
+        #print(summarizer.predicted_labels)
         train_losses.append(train_loss)
         print('| Epoch {:3d} | training time: {:5.2f}s |'.format(epoch, (time.time() - epoch_start_time)))
         print('Gold energy: %s, Predicted energy: %s' % (g_energy, p_energy))
