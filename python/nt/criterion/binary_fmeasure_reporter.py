@@ -58,3 +58,17 @@ class BinaryFMeasureReporter(object):
                             "recall": recall, 
                             "f-measure": fmeasure}} 
 
+    def report_string(self):
+        rd = self.result_dict()
+
+        tmp = "prec: {precision:0.3f} recall: {recall:0.3f} " \
+            "f-meas.: {f-measure:0.3f}"
+        
+        line2 = tmp.format(**rd[self.name])
+        max_len = max(len(self.name), len(line2))
+        line1 = ".-" + self.name + "-" * (max_len - len(self.name)) + "-."
+        line2 = "| " + line2 + " |"
+        line3 = ".-" + "-" * max_len + "-."
+        lines = [line1, line2, line3]
+        return lines, 3, len(line1)
+

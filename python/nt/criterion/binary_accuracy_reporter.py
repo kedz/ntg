@@ -12,7 +12,7 @@ class BinaryAccuracyReporter(object):
             raise Exception("mode must be either 'prob' or 'logit'.")
 
         self.mode_ = mode
-        self.name_ = "BinaryAccuracyReport"
+        self.name_ = "BinaryAccuracyReporter"
         self.total_examples_ = 0
         self.total_correct_ = 0
 
@@ -46,3 +46,17 @@ class BinaryAccuracyReporter(object):
         else:
             acc = self.total_correct_ / self.total_examples_
         return {self.name: {"accuracy": acc}}
+
+    def report_string(self):
+        rd = self.result_dict()
+
+        tmp = "Accuracy: {accuracy:0.3f}"
+        
+        line2 = tmp.format(**rd[self.name])
+        max_len = max(len(self.name), len(line2))
+        line1 = ".-" + self.name + "-" * (max_len - len(self.name)) + "-."
+        line2 = "| " + line2 + " " * (max_len - len(line2))  + " |"
+        line3 = ".-" + "-" * max_len + "-."
+        lines = [line1, line2, line3]
+        return lines, 3, len(line1)
+
