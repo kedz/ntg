@@ -48,7 +48,7 @@ class FMeasureCrossEntropy(Criterion):
         return self.cross_entropy.eval(logits, targets)
 
     def compute_loss(self, batch):
-        logits = self.model(batch)
+        logits = self.model(batch.inputs)
         batch_loss = self.eval(logits, batch.targets)
         return batch_loss
 

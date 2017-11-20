@@ -2,6 +2,7 @@ import torch
 
 class MDSEmbeddingReader():
     def __init__(self):
+        print("WARNING: DONT USE EMBEDDING READER TWICE")
         self.document_set_ids = []
         self.document_ids = []
         self.sentence_ids = []
@@ -45,4 +46,5 @@ class MDSEmbeddingReader():
 
         return (self.document_set_ids, self.document_ids, sent_ids, self.texts,
                 embeddings, labels, torch.LongTensor(self.lengths))
+
 

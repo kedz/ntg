@@ -98,7 +98,6 @@ def train_epoch_(crit, dataset, show_progress=True):
     max_steps = ceil(dataset.size / dataset.batch_size)
     crit.reset()
     crit.model.train()
-    print(crit.model.mlp.training)
 
     for step, batch in enumerate(dataset.iter_batch(), 1):
         crit.minimize(batch)
@@ -111,7 +110,6 @@ def eval_(crit, dataset, show_progress=True):
     max_steps = ceil(dataset.size / dataset.batch_size)
     crit.reset()
     crit.model.eval()
-    print(crit.model.mlp.training)
 
     for step, batch in enumerate(dataset.iter_batch(), 1):
         

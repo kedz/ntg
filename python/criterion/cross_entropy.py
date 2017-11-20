@@ -35,7 +35,7 @@ class CrossEntropy(Criterion):
         return batch_loss
 
     def compute_loss(self, batch):
-        logits = self.model(batch)
+        logits = self.model(batch.inputs)
         batch_loss = self.eval(logits, batch.targets)
         return batch_loss
 

@@ -24,7 +24,7 @@ class Criterion(ABC):
         self.optimizer.zero_grad()
         
         # forward pass
-        logits = self.model(batch)
+        logits = self.model(batch.inputs)
         batch_loss = self.eval(logits, batch.targets)
         
         # backward pass
