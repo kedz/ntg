@@ -18,14 +18,29 @@ def optimize_criterion(criterion, model, optimizer, training_data,
 
         if show_progress:
             print("\n === Epoch {} ===".format(epoch))
+            print("   * == Training == ")
+
         train_epoch(criterion, model, optimizer, training_data)
-        print(criterion.result_dict())
+        criterion.checkpoint("training")
+
+        if show_progress:
+            print(criterion.report(indent="     "))
+
+        if validation_data is not None:
+
+            if show_progress:
+                print("\n  * == Validation ==")
+
+            eval(criterion, model, validation_data)
+            criterion.checkpoint("validation")
+            
+            if show_progress:
+                print(criterion.report(indent="     "))
+                print("\n     Best epoch: {} obj: {}\n".format( 
+                    *criterion.best_checkpoint("validation")))
 
         if show_progress:
             print("")
-        if validation_data is not None:
-            eval(criterion, model, validation_data)
-            print(criterion.result_dict())
 
 def train_epoch(criterion, model, optimizer, dataset, step_callback=None):
     max_steps = math.ceil(dataset.size / dataset.batch_size)
@@ -52,14 +67,13 @@ def eval(criterion, model, dataset, step_callback=None):
         step_callback(step, max_steps, batch_loss, criterion)
 
 
-
-
 def default_step_callback(step, max_steps, batch_loss, criterion):
     sys.stdout.write("\r")
     sys.stdout.write(" " * 79)
     sys.stdout.write("\r")
     sys.stdout.write(
-        "{} / {} | obj: {:0.4f}".format(step, max_steps, criterion.avg_loss))
+        "\t{} / {} | obj: {:0.4f}".format(step, max_steps, criterion.avg_loss))
     sys.stdout.flush()
+    if step == max_steps:
+        print("\n")
 
-#def epoch_start_callback(epoch, model, criterion
