@@ -5,12 +5,14 @@ import random
 from collections import namedtuple
 
 class Dataset(object):
-    def __init__(self, *tensors, layout=None, batch_size=1, shuffle=True, 
-                 gpu=-1):
+    def __init__(self, *tensors, layout=None, metadata=None, batch_size=1, 
+                 shuffle=True, gpu=-1):
         
         self.data_ = []
         self.length_ = []
         self.name_ = []
+
+        self.metadata_ = metadata
 
         self.cpu_buffers_ = []
         self.name2cpu_buffer_ = {}
@@ -45,9 +47,12 @@ class Dataset(object):
         gpu = self.gpu
         batch_size = self.batch_size
         shuffle = self.shuffle
+        metadata = None
+        if self.metadata is not None:
+            metadata = [self.metadata[idx] for idx in index]
 
-        return Dataset(*data, layout=layout, batch_size=batch_size, 
-                       shuffle=shuffle, gpu=gpu)
+        return Dataset(*data, layout=layout, batch_size=batch_size,
+                       metadata=metadata, shuffle=shuffle, gpu=gpu)
 
     def register_data(self, tensor, length, name):
         self.data_.append(tensor)
@@ -66,6 +71,7 @@ class Dataset(object):
         for p in range(0, self.size, self.batch_size):
             indices_batch = indices[p:p + self.batch_size]
 
+
             for j in range(len(self.data_)):
                 length = self.length_[j]
                 if length is not None:
@@ -79,8 +85,16 @@ class Dataset(object):
 
                 if self.gpu_ > -1:
                     self.gpu_buffers_[j].resize_(buffer.size()).copy_(buffer)
+            # TODO make this lazy somehow
+            if self.metadata is not None:
+                md_batch = [self.metadata[idx] for idx in indices_batch]
+                self.cpu_batch_.metadata = md_batch
+
             yield self.cpu_batch_
  
+    @property
+    def metadata(self):
+        return self.metadata_
    
     @property
     def shuffle(self):
