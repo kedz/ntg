@@ -29,9 +29,12 @@ class DenseVector(FieldReaderBase):
 
     def read_extract(self, vector_or_string):
         if self.sep is None:
-            vector = vector_or_string
+            if isinstance(vector_or_string, str):
+                vector = [float(vector_or_string)]
+            else:
+                vector = vector_or_string
         else:
-            vector = [self.vector_type(x) 
+            vector = [float(x) 
                       for x in vector_or_string.split(self.sep)]
         if self.expected_size is None:
             self.expected_size_ = len(vector)
