@@ -27,6 +27,9 @@ class FieldReaderBase(ABC):
             raise Exception("map_value must be of type int.")
         self.field_map_ = map_value
 
+    def clear_field_map(self):
+        self.field_map_ = None
+
     @property
     def field(self):
         return self.field_
