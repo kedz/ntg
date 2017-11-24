@@ -21,7 +21,6 @@ class XSVReader(FileReaderBase):
 
     def apply_readers(self, path):
 
-
         with open(path, "r") as fp:
             if self.skip_header:
                 header_dict = {}
