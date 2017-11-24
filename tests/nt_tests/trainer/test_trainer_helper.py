@@ -1,9 +1,10 @@
 import unittest
-import nt.trainer.trainer_helper as trainer_helper
+import nt
 import torch
 import math
 import random
 from collections import defaultdict
+
 
 class TestTrainerHelper(unittest.TestCase):
 
@@ -18,7 +19,7 @@ class TestTrainerHelper(unittest.TestCase):
         indices1 = [i for i in range(data_size1)]
         labels1 = [0, 0, 1, 1, 1]
         with self.assertRaises(Exception) as context:
-            trainer_helper.stratified_generate_splits(indices1, labels1)
+            nt.trainer.stratified_generate_splits(indices1, labels1)
             self.assertEqual(
                 "labels and indices must be the same size.",
                 context.exception)
@@ -30,7 +31,7 @@ class TestTrainerHelper(unittest.TestCase):
         indices2 = set([i for i in range(0, data_size2)])
         labels2 = [0, 0, 1, 1]
         with self.assertRaises(Exception) as context:
-            trainer_helper.stratified_generate_splits(indices2, labels2)
+            nt.trainer.stratified_generate_splits(indices2, labels2)
             self.assertEqual(
                 "indices must be a list, tuple, or torch.LongTensor of " \
                 "nonnegative integers.",
@@ -43,7 +44,7 @@ class TestTrainerHelper(unittest.TestCase):
         indices3 = [i for i in range(-1, data_size2 - 1)]
         labels3 = [0, 0, 1, 1]
         with self.assertRaises(Exception) as context:
-            trainer_helper.stratified_generate_splits(indices3, labels3)
+            nt.trainer.stratified_generate_splits(indices3, labels3)
             self.assertEqual(
                 "indices must be a list, tuple, or torch.LongTensor of " \
                 "nonnegative integers.",
@@ -56,7 +57,7 @@ class TestTrainerHelper(unittest.TestCase):
         indices4 = [i for i in range(0, data_size2)]
         labels4 = set([0, 0, 1, 1])
         with self.assertRaises(Exception) as context:
-            trainer_helper.stratified_generate_splits(indices4, labels4)
+            nt.trainer.stratified_generate_splits(indices4, labels4)
             self.assertEqual(
                 "labels must be a list, tuple, or torch.LongTensor of " \
                 "nonnegative integers.",
@@ -69,7 +70,7 @@ class TestTrainerHelper(unittest.TestCase):
         indices5 = [i for i in range(data_size2)]
         labels5 = [0, 0, -1, 1]
         with self.assertRaises(Exception) as context:
-            trainer_helper.stratified_generate_splits(indices5, labels5)
+            nt.trainer.stratified_generate_splits(indices5, labels5)
             self.assertEqual(
                 "labels must be a list, tuple, or torch.LongTensor of " \
                 "nonnegative integers.",
@@ -88,7 +89,7 @@ class TestTrainerHelper(unittest.TestCase):
         indices1 = [i for i in range(data_size1)]
         labels1 = [0, 0, 1, 1]
         
-        tr_idx, te_idx = trainer_helper.stratified_generate_splits(
+        tr_idx, te_idx = nt.trainer.stratified_generate_splits(
             indices1, labels1, train_per=train_per1, valid_per=valid_per1)
 
         train_label_counts1 = defaultdict(int)
@@ -110,7 +111,7 @@ class TestTrainerHelper(unittest.TestCase):
         indices2 = [i for i in range(data_size2)]
         labels2 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         
-        tr_idx, val_idx, te_idx = trainer_helper.stratified_generate_splits(
+        tr_idx, val_idx, te_idx = nt.trainer.stratified_generate_splits(
             indices2, labels2, train_per=train_per2, valid_per=valid_per2)
 
         train_label_counts2 = defaultdict(int)
@@ -143,7 +144,7 @@ class TestTrainerHelper(unittest.TestCase):
         data_size1 = 10
         indices1 = [i for i in range(-1, data_size1 - 1)]
         with self.assertRaises(Exception) as context:
-            trainer_helper.generate_splits(indices1)
+            nt.trainer.generate_splits(indices1)
             self.assertEqual(
                 "indices must be a list, tuple, or torch.LongTensor of " \
                 "nonnegative integers.",
@@ -155,7 +156,7 @@ class TestTrainerHelper(unittest.TestCase):
         data_size2 = 10
         indices2 = set([i for i in range(0, data_size2)])
         with self.assertRaises(Exception) as context:
-            trainer_helper.generate_splits(indices2)
+            nt.trainer.generate_splits(indices2)
             self.assertEqual(
                 "indices must be a list, tuple, or torch.LongTensor of " \
                 "nonnegative integers.",
@@ -165,7 +166,7 @@ class TestTrainerHelper(unittest.TestCase):
         data_size3 = 2 
         indices3 = set([i for i in range(0, data_size3)])
         with self.assertRaises(Exception) as context:
-            trainer_helper.generate_splits(indices3)
+            nt.trainer.generate_splits(indices3)
             self.assertEqual(
                 'Not enough data points.',
                 context.exception)
@@ -175,7 +176,7 @@ class TestTrainerHelper(unittest.TestCase):
         data_size4 = 10
         indices4 = set([i for i in range(0, data_size4)])
         with self.assertRaises(Exception) as context:
-            trainer_helper.generate_splits(
+            nt.trainer.generate_splits(
                 indices4, train_per=train_per4)
             self.assertEqual(
                 "train_per must be float in [0, 1]",
@@ -186,7 +187,7 @@ class TestTrainerHelper(unittest.TestCase):
         data_size5 = 10
         indices5 = set([i for i in range(0, data_size5)])
         with self.assertRaises(Exception) as context:
-            trainer_helper.generate_splits(
+            nt.trainer.generate_splits(
                 indices5, train_per=train_per5)
             self.assertEqual(
                 "train_per must be float in [0, 1]",
@@ -197,7 +198,7 @@ class TestTrainerHelper(unittest.TestCase):
         data_size6 = 10
         indices6 = set([i for i in range(0, data_size6)])
         with self.assertRaises(Exception) as context:
-            trainer_helper.generate_splits(
+            nt.trainer.generate_splits(
                 indices6, valid_per=valid_per6)
             self.assertEqual(
                 "valid_per must be float in (0, 1]",
@@ -208,7 +209,7 @@ class TestTrainerHelper(unittest.TestCase):
         data_size7 = 10
         indices7 = set([i for i in range(0, data_size7)])
         with self.assertRaises(Exception) as context:
-            trainer_helper.generate_splits(
+            nt.trainer.generate_splits(
                 indices7, valid_per=valid_per7)
             self.assertEqual(
                 "valid_per must be float in (0, 1]",
@@ -232,7 +233,7 @@ class TestTrainerHelper(unittest.TestCase):
         shuffle1 = False
         indices1 = [i for i in range(data_size1)]
 
-        tr_idx1, te_idx1 = trainer_helper.generate_splits(
+        tr_idx1, te_idx1 = nt.trainer.generate_splits(
             indices1, train_per=train_per1, valid_per=valid_per1, 
             shuffle=shuffle1)
         all_indices1 = tuple(tr_idx1.tolist() + te_idx1.tolist())
@@ -248,7 +249,7 @@ class TestTrainerHelper(unittest.TestCase):
         shuffle2 = True
         indices2 = [i for i in range(data_size2)]
 
-        tr_idx2, te_idx2 = trainer_helper.generate_splits(
+        tr_idx2, te_idx2 = nt.trainer.generate_splits(
             indices2, train_per=train_per2, valid_per=valid_per2, 
             shuffle=shuffle2)
         all_indices2 = tuple(tr_idx2.tolist() + te_idx2.tolist())
@@ -265,7 +266,7 @@ class TestTrainerHelper(unittest.TestCase):
         shuffle3 = False
         indices3 = [i for i in range(data_size3)]
 
-        tr_idx3, val_idx3, te_idx3 = trainer_helper.generate_splits(
+        tr_idx3, val_idx3, te_idx3 = nt.trainer.generate_splits(
             indices3, train_per=train_per3, valid_per=valid_per3, 
             shuffle=shuffle3)
         all_indices3 = tuple(
@@ -283,7 +284,7 @@ class TestTrainerHelper(unittest.TestCase):
         shuffle4 = True
         indices4 = [i for i in range(data_size4)]
 
-        tr_idx4, val_idx4, te_idx4 = trainer_helper.generate_splits(
+        tr_idx4, val_idx4, te_idx4 = nt.trainer.generate_splits(
             indices4, train_per=train_per4, valid_per=valid_per4, 
             shuffle=shuffle4)
         all_indices4 = tuple(
@@ -305,7 +306,7 @@ class TestTrainerHelper(unittest.TestCase):
         shuffle1 = True
         indices1 = [i for i in range(data_size1)]
 
-        tr_idx1, te_idx1 = trainer_helper.generate_splits(
+        tr_idx1, te_idx1 = nt.trainer.generate_splits(
             indices1, train_per=train_per1, valid_per=valid_per1, 
             shuffle=shuffle1)
 
@@ -326,7 +327,7 @@ class TestTrainerHelper(unittest.TestCase):
         shuffle2 = True
         indices2 = tuple([i for i in range(data_size2)])
 
-        tr_idx2, te_idx2 = trainer_helper.generate_splits(
+        tr_idx2, te_idx2 = nt.trainer.generate_splits(
             indices2, train_per=train_per2, valid_per=valid_per2, 
             shuffle=shuffle2)
 
@@ -347,7 +348,7 @@ class TestTrainerHelper(unittest.TestCase):
         shuffle3 = True
         indices3 = torch.arange(0, data_size3).long()
 
-        tr_idx3, te_idx3 = trainer_helper.generate_splits(
+        tr_idx3, te_idx3 = nt.trainer.generate_splits(
             indices3, train_per=train_per3, valid_per=valid_per3, 
             shuffle=shuffle3)
 
@@ -375,7 +376,7 @@ class TestTrainerHelper(unittest.TestCase):
         shuffle1 = True
         indices1 = [i for i in range(data_size1)]
 
-        tr_idx1, val_idx1, te_idx1 = trainer_helper.generate_splits(
+        tr_idx1, val_idx1, te_idx1 = nt.trainer.generate_splits(
             indices1, train_per=train_per1, valid_per=valid_per1, 
             shuffle=shuffle1)
 
@@ -398,7 +399,7 @@ class TestTrainerHelper(unittest.TestCase):
         shuffle2 = True
         indices2 = tuple([i for i in range(data_size2)])
 
-        tr_idx2, val_idx2, te_idx2 = trainer_helper.generate_splits(
+        tr_idx2, val_idx2, te_idx2 = nt.trainer.generate_splits(
             indices2, train_per=train_per2, valid_per=valid_per2, 
             shuffle=shuffle2)
 
@@ -421,7 +422,7 @@ class TestTrainerHelper(unittest.TestCase):
         shuffle3 = True
         indices3 = torch.arange(0, data_size3).long()
 
-        tr_idx3, val_idx3, te_idx3 = trainer_helper.generate_splits(
+        tr_idx3, val_idx3, te_idx3 = nt.trainer.generate_splits(
             indices3, train_per=train_per3, valid_per=valid_per3, 
             shuffle=shuffle3)
 
@@ -445,7 +446,7 @@ class TestTrainerHelper(unittest.TestCase):
         indices1 = [i for i in range(data_size1)]
         labels1 = [0, 0, 1, 1, 1]
         with self.assertRaises(Exception) as context:
-            trainer_helper.stratified_kfold_iter(indices1, labels1, num_folds1)
+            nt.trainer.stratified_kfold_iter(indices1, labels1, num_folds1)
             self.assertEqual(
                 "labels and indices must be the same size.",
                 context.exception)
@@ -458,7 +459,7 @@ class TestTrainerHelper(unittest.TestCase):
         indices2 = set([i for i in range(0, data_size2)])
         labels2 = [0, 0, 1, 1]
         with self.assertRaises(Exception) as context:
-            trainer_helper.stratified_kfold_iter(indices2, labels2, num_folds2)
+            nt.trainer.stratified_kfold_iter(indices2, labels2, num_folds2)
             self.assertEqual(
                 "indices must be a list, tuple, or torch.LongTensor of " \
                 "nonnegative integers.",
@@ -472,7 +473,7 @@ class TestTrainerHelper(unittest.TestCase):
         indices3 = [i for i in range(-1, data_size2 - 1)]
         labels3 = [0, 0, 1, 1]
         with self.assertRaises(Exception) as context:
-            trainer_helper.stratified_kfold_iter(indices3, labels3, num_folds3)
+            nt.trainer.stratified_kfold_iter(indices3, labels3, num_folds3)
             self.assertEqual(
                 "indices must be a list, tuple, or torch.LongTensor of " \
                 "nonnegative integers.",
@@ -486,7 +487,7 @@ class TestTrainerHelper(unittest.TestCase):
         indices4 = [i for i in range(0, data_size2)]
         labels4 = set([0, 0, 1, 1])
         with self.assertRaises(Exception) as context:
-            trainer_helper.stratified_kfold_iter(indices4, labels4, num_folds4)
+            nt.trainer.stratified_kfold_iter(indices4, labels4, num_folds4)
             self.assertEqual(
                 "labels must be a list, tuple, or torch.LongTensor of " \
                 "nonnegative integers.",
@@ -500,7 +501,7 @@ class TestTrainerHelper(unittest.TestCase):
         indices5 = [i for i in range(data_size2)]
         labels5 = [0, 0, -1, 1]
         with self.assertRaises(Exception) as context:
-            trainer_helper.stratified_kfold_iter(indices5, labels5, num_folds5)
+            nt.trainer.stratified_kfold_iter(indices5, labels5, num_folds5)
             self.assertEqual(
                 "labels must be a list, tuple, or torch.LongTensor of " \
                 "nonnegative integers.",
@@ -518,7 +519,7 @@ class TestTrainerHelper(unittest.TestCase):
         indices1 = [i for i in range(data_size1)]
         labels1 = [0, 0, 1, 1]
         
-        kfold_iter1 = trainer_helper.stratified_kfold_iter(
+        kfold_iter1 = nt.trainer.stratified_kfold_iter(
             indices1, labels1, num_folds1, valid_per=valid_per1)
 
         for tr_idx, te_idx in kfold_iter1:
@@ -542,7 +543,7 @@ class TestTrainerHelper(unittest.TestCase):
         labels2 = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
         valid_per2 = .1
         
-        kfold_iter2 = trainer_helper.stratified_kfold_iter(
+        kfold_iter2 = nt.trainer.stratified_kfold_iter(
             indices2, labels2, num_folds2, valid_per=valid_per2)
 
         for tr_idx, val_idx, te_idx in kfold_iter2:
@@ -578,7 +579,7 @@ class TestTrainerHelper(unittest.TestCase):
         data_size1 = 5
         indices1 = [i for i in range(0, data_size1)]
         
-        fold_iter = trainer_helper.kfold_iter(
+        fold_iter = nt.trainer.kfold_iter(
             indices1, num_folds1, valid_per=0, shuffle=False)
 
         for i, (tr_idx, te_idx) in enumerate(fold_iter):
@@ -607,7 +608,7 @@ class TestTrainerHelper(unittest.TestCase):
         data_size1 = 5
         indices1 = [i for i in range(-5, data_size1)]
         with self.assertRaises(Exception) as context:
-            trainer_helper.kfold_iter(indices1, num_folds1)
+            nt.trainer.kfold_iter(indices1, num_folds1)
             self.assertEqual(
                 "indices must be a list, tuple, or torch.LongTensor of " \
                 "nonnegative integers.",
@@ -620,7 +621,7 @@ class TestTrainerHelper(unittest.TestCase):
         data_size2 = 5
         indices2 = set([i for i in range(0, data_size2)])
         with self.assertRaises(Exception) as context:
-            trainer_helper.kfold_iter(indices2, num_folds2)
+            nt.trainer.kfold_iter(indices2, num_folds2)
             self.assertEqual(
                 "indices must be a list, tuple, or torch.LongTensor of " \
                 "nonnegative integers.",
@@ -631,7 +632,7 @@ class TestTrainerHelper(unittest.TestCase):
         data_size3 = 5
         indices3 = set([i for i in range(0, data_size3)])
         with self.assertRaises(Exception) as context:
-            trainer_helper.kfold_iter(indices3, num_folds3)
+            nt.trainer.kfold_iter(indices3, num_folds3)
             self.assertEqual(
                 'Not enough data points for {} folds.'.format(num_folds5),
                 context.exception)
@@ -642,7 +643,7 @@ class TestTrainerHelper(unittest.TestCase):
         valid_per4 = -.1
         indices4 = set([i for i in range(0, data_size4)])
         with self.assertRaises(Exception) as context:
-            trainer_helper.kfold_iter(
+            nt.trainer.kfold_iter(
                 indices4, num_folds4, valid_per=valid_per4)
             self.assertEqual(
                 "valid_per must be float in range (0, 1]",
@@ -665,7 +666,7 @@ class TestTrainerHelper(unittest.TestCase):
         exp_last_train_size1 = data_size1 - exp_last_fold_size1 - exp_val_size1
 
         indices1 = [i for i in range(data_size1)]
-        fold_iter1 = trainer_helper.kfold_iter(
+        fold_iter1 = nt.trainer.kfold_iter(
             indices1, num_folds1, valid_per=valid_per1)
         
         found_test_indices1 = []
@@ -703,7 +704,7 @@ class TestTrainerHelper(unittest.TestCase):
         exp_train_size2 = data_size2 - exp_fold_size2 - exp_val_size2
         exp_last_train_size2 = data_size2 - exp_last_fold_size2 - exp_val_size2
         indices2 = tuple([i for i in range(data_size2)])
-        fold_iter2 = trainer_helper.kfold_iter(
+        fold_iter2 = nt.trainer.kfold_iter(
             indices2, num_folds2, valid_per=valid_per2)
         
         found_test_indices2 = []
@@ -742,7 +743,7 @@ class TestTrainerHelper(unittest.TestCase):
         exp_last_train_size3 = data_size3 - exp_last_fold_size3 - exp_val_size3
 
         indices3 = torch.arange(0, data_size3).long()
-        fold_iter3 = trainer_helper.kfold_iter(
+        fold_iter3 = nt.trainer.kfold_iter(
             indices3, num_folds3, valid_per=valid_per3)
         
         found_test_indices3 = []
@@ -787,7 +788,7 @@ class TestTrainerHelper(unittest.TestCase):
         exp_last_train_size1 = data_size1 - exp_last_fold_size1 
 
         indices1 = [i for i in range(data_size1)]
-        fold_iter1 = trainer_helper.kfold_iter(
+        fold_iter1 = nt.trainer.kfold_iter(
             indices1, num_folds1, valid_per=valid_per1)
         
         found_test_indices1 = []
@@ -821,7 +822,7 @@ class TestTrainerHelper(unittest.TestCase):
         exp_last_train_size2 = data_size2 - exp_last_fold_size2
 
         indices2 = tuple([i for i in range(data_size2)])
-        fold_iter2 = trainer_helper.kfold_iter(
+        fold_iter2 = nt.trainer.kfold_iter(
             indices2, num_folds2, valid_per=valid_per2)
         
         found_test_indices2 = []
@@ -855,7 +856,7 @@ class TestTrainerHelper(unittest.TestCase):
         exp_last_train_size3 = data_size3 - exp_last_fold_size3
 
         indices3 = torch.arange(0, data_size3).long()
-        fold_iter3 = trainer_helper.kfold_iter(
+        fold_iter3 = nt.trainer.kfold_iter(
             indices3, num_folds3, valid_per=valid_per3)
         
         found_test_indices3 = []
