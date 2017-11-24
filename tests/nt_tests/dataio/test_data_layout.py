@@ -1,5 +1,5 @@
 import unittest
-from dataset import DataLayout
+from nt.dataio import DataLayout
 import torch
 
 class TestDataLayout(unittest.TestCase):

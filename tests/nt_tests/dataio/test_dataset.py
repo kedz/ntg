@@ -1,5 +1,5 @@
 import unittest
-from dataset import Dataset3
+from nt.dataio import Dataset
 import torch
 
 class TestDataset(unittest.TestCase):
@@ -19,7 +19,7 @@ class TestDataset(unittest.TestCase):
         data = [(feature1, "feature1"), (feature2, "feature2"), 
                 (labels, "targets")]
 
-        dataset = Dataset3(*data, batch_size=1, shuffle=False, gpu=-1)
+        dataset = Dataset(*data, batch_size=1, shuffle=False, gpu=-1)
 
         self.assertTrue(hasattr(dataset, "feature1"))
         self.assertTrue(hasattr(dataset, "feature2"))
@@ -49,7 +49,8 @@ class TestDataset(unittest.TestCase):
         data = [(feature1, "feature1"), (feature2, "feature2"), 
                 (labels, "targets")]
 
-        dataset = Dataset3(*data, layout=layout, batch_size=1, shuffle=False, gpu=-1)
+        dataset = Dataset(
+            *data, layout=layout, batch_size=1, shuffle=False, gpu=-1)
 
         self.assertTrue(hasattr(dataset, "inputs"))
         self.assertTrue(hasattr(dataset.inputs, "feature1"))
@@ -80,7 +81,8 @@ class TestDataset(unittest.TestCase):
         data = [(feature1, "feature1"), (feature2, "feature2"), 
                 (labels, "targets")]
 
-        dataset = Dataset3(*data, layout=layout, batch_size=1, shuffle=False, gpu=-1)
+        dataset = Dataset(
+            *data, layout=layout, batch_size=1, shuffle=False, gpu=-1)
         index = torch.LongTensor([0, 2])
         subset = dataset.index_select(index)
         
@@ -110,7 +112,8 @@ class TestDataset(unittest.TestCase):
 
         bs = 3
 
-        dataset = Dataset3(*data, layout=layout, batch_size=bs, shuffle=False, gpu=-1)
+        dataset = Dataset(
+            *data, layout=layout, batch_size=bs, shuffle=False, gpu=-1)
         index = torch.LongTensor([i for i in range(11)])
 
         for batch_num, batch in enumerate(dataset.iter_batch()):
@@ -148,7 +151,7 @@ class TestDataset(unittest.TestCase):
 
         bs = 3
 
-        dataset = Dataset3(*data, layout=layout, batch_size=bs, shuffle=True, gpu=-1)
+        dataset = Dataset(*data, layout=layout, batch_size=bs, shuffle=True, gpu=-1)
         index = torch.LongTensor([i for i in range(11)])
 
         found_labels = []
