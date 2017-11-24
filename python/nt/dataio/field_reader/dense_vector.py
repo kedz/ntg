@@ -31,6 +31,8 @@ class DenseVector(FieldReaderBase):
         if self.sep is None:
             if isinstance(vector_or_string, str):
                 vector = [float(vector_or_string)]
+            elif isinstance(vector_or_string, (int, float)):
+                vector = [float(vector_or_string)]
             else:
                 vector = vector_or_string
         else:
