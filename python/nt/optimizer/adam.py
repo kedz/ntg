@@ -1,5 +1,5 @@
 import torch.optim
-from optimizer import OptimizerBase
+from .optimizer_base import OptimizerBase
 
 class Adam(OptimizerBase):
     def __init__(self, parameters, lr=.001, weight_decay=0.0):
