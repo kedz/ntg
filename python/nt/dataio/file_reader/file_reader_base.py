@@ -28,4 +28,4 @@ class FileReaderBase(ABC):
         all_reader_data = []
         for reader in self.readers_:
             all_reader_data.append(reader.finish_read())
-        return all_reader_data
+        return tuple(all_reader_data)
