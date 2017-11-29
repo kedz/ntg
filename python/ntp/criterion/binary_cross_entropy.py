@@ -6,8 +6,9 @@ import torch.nn.functional as F
 # TODO add tests for exception throwing.
 class BinaryCrossEntropy(CriterionBase):
 
-    def __init__(self, mode="prob", weight=None, mask_value=None):
-        super(BinaryCrossEntropy, self).__init__()
+    def __init__(self, mode="prob", weight=None, mask_value=None,
+                 name="BinaryCrossEntropy"):
+        super(BinaryCrossEntropy, self).__init__(name)
         
         if mode not in ["prob", "logit"]:
             raise Exception("Invalid mode")
@@ -27,7 +28,18 @@ class BinaryCrossEntropy(CriterionBase):
         self.tot_cross_entropy_ = 0
         self.tot_examples_ = 0
 
-      
+    @property
+    def initial_value(self):
+        return float("inf")
+
+    def is_better(self, new_value, old_value):
+        if new_value < old_value:
+            return True
+        else:
+            return False
+
+    def criterion_value_from_result_dict(self, result_dict):
+        return result_dict[self.name]["criterion"]    
 
     @property
     def mask_value(self):

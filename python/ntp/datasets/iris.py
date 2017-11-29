@@ -2,7 +2,7 @@ import os
 import urllib.request
 import json
 
-from nt.datasets import get_data_dir
+from .util import get_data_dir
 
 
 def download_iris_data():

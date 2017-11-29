@@ -77,7 +77,7 @@ class Sequence(FieldReaderBase):
                     raise Exception("Sequence does not know how to deal " \
                                     "with type {}".format(type(data)))
             all_results.append(tuple(seq_results))
-        return tuple(all_results)
+        return tuple(all_results), torch.LongTensor(self.sequence_lengths)
             
     def pad_tensor_data(self, data):
         max_length = max(self.sequence_lengths)

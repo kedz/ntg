@@ -1,14 +1,23 @@
+import os
 import math
 import sys
+import torch
 
 def optimize_criterion(criterion, model, optimizer, training_data, 
                        validation_data=None, max_epochs=10, 
+                       save_model=None,
                        show_progress=True):
     '''
     Minimize/maximize model criterion w.r.t. to the training data using the
     supplied optimizer. If validation data is provided, track learning 
     progress on this data set.
     '''
+
+    if save_model is not None:
+        model_dir = os.path.dirname(save_model)
+        if model_dir != '' and not os.path.exists(model_dir):
+            os.makedirs(model_dir)
+
 
     result_data = {"training": []}
     if validation_data is not None:
@@ -35,9 +44,14 @@ def optimize_criterion(criterion, model, optimizer, training_data,
             criterion.checkpoint("validation")
             
             if show_progress:
+
+                best_epoch, obj = criterion.find_best_checkpoint("validation")
+                if best_epoch == epoch and save_model is not None:
+                    torch.save(model, save_model)
                 print(criterion.report(indent="     "))
-                print("\n     Best epoch: {} obj: {}\n".format( 
-                    *criterion.best_checkpoint("validation")))
+                print("\n     Best epoch: {} obj: {}\n".format(
+                    best_epoch, obj))
+
 
         if show_progress:
             print("")
