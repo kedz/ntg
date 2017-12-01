@@ -177,7 +177,10 @@ class Dataset(object):
         
     @property
     def size(self):
-        return self.data_[0].size(0)
+        if isinstance(self.data_[0], (list, tuple)):
+            return len(self.data_[0])
+        else:
+            return self.data_[0].size(0)
  
     def __getattr__(self, attr):
         return getattr(self.data_layout_, attr)
