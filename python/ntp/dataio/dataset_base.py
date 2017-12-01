@@ -9,7 +9,7 @@ from collections import namedtuple
 
 class Dataset(object):
     def __init__(self, *tensors, layout=None, batch_size=1, 
-                 shuffle=True, gpu=-1, lengths=None):
+                 shuffle=True, gpu=-1, lengths=None, length_sort=True):
         
         self.data_ = []
         self.length_ = []
@@ -24,6 +24,7 @@ class Dataset(object):
         self.gpu_ = gpu
         self.shuffle_ = shuffle
         self.batch_size_ = batch_size
+        self.length_sort = length_sort
 
         for tensor_data in tensors:
             if len(tensor_data) == 2:
@@ -101,7 +102,7 @@ class Dataset(object):
             random.shuffle(indices)
         indices = torch.LongTensor(indices)
 
-        if self.example_lengths_ is not None:
+        if self.example_lengths_ is not None and self.length_sort:
             step_size = self.batch_size * 25
             for i in range(0, self.size, step_size):
                 indices_chunk = indices[i:i + step_size]
