@@ -34,11 +34,11 @@ class BinaryFMeasureReporter(object):
     def update(self, output, expected):
 
         if self.mode == "logit":
-            prob = F.sigmoid(output.data)
+            prob = F.sigmoid(output.data) #.cpu()
         else:
-            prob = output.data
+            prob = output.data #.cpu()
 
-        pred_labels = prob.gt(.5)
+        pred_labels = prob.gt(.5).cpu()
         for pred, expected in zip(pred_labels.view(-1),
                                   expected.data.view(-1)):
             if expected == 0 or expected == 1:
