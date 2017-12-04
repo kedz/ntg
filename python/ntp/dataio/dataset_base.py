@@ -18,10 +18,10 @@ class Dataset(object):
         self.example_lengths_ = lengths
 
         self.cpu_buffers_ = []
+        self.gpu_buffers_ = []
         self.name2cpu_buffer_ = {}
         self.name2gpu_buffer_ = {}
         
-        self.gpu_ = gpu
         self.shuffle_ = shuffle
         self.batch_size_ = batch_size
         self.length_sort = length_sort
@@ -45,6 +45,12 @@ class Dataset(object):
        
         self.data_layout_ = DataLayout(layout, name2data, "Dataset")
         self.cpu_batch_ = DataLayout(layout, self.name2cpu_buffer_, "CPUBatch")
+
+        self.gpu = gpu
+
+    @property
+    def layout(self):
+        return self.data_layout_
         
     def index_select(self, index):
         if isinstance(index, (list, tuple)):
@@ -127,11 +133,13 @@ class Dataset(object):
         for p in range(0, self.size, self.batch_size):
             indices_batch = indices[p:p + self.batch_size]
 
-
             for j in range(len(self.data_)):
                 if isinstance(self.data_[j], (list, tuple)):
                     ldata = self.data_[j]
-                    ldata_buffer = self.cpu_buffers_[j]
+                    if self.gpu_ > -1:
+                        ldata_buffer = self.gpu_buffers_[j]
+                    else:
+                        ldata_buffer = self.cpu_buffers_[j]
                     del ldata_buffer[:]
 
                     for idx in indices_batch:
@@ -149,10 +157,12 @@ class Dataset(object):
                             0, indices_batch, out=self.cpu_buffers_[j].data)
 
                     if self.gpu_ > -1:
-                        self.gpu_buffers_[j].resize_(buffer.size()).copy_(
+                        self.gpu_buffers_[j].data.resize_(buffer.size()).copy_(
                             buffer)
-
-            yield self.cpu_batch_
+            if self.gpu_ > -1:
+                yield self.gpu_batch_
+            else:
+                yield self.cpu_batch_
  
     @property
     def shuffle(self):
@@ -165,6 +175,35 @@ class Dataset(object):
     @property
     def gpu(self):
         return self.gpu_
+
+    @gpu.setter
+    def gpu(self, device):
+        if not isinstance(device, int) or device < -1:
+            raise Exception("device must be int >= -1")
+        if device == -1:
+            self.gpu_ = -1
+            self.gpu_buffers_ = []
+            self.name2gpu_buffer_ = {}
+        else:
+            self.gpu_ = device
+            for name, buffer in zip(self.name_, self.cpu_buffers_):
+                if isinstance(buffer, (list, tuple)):
+                    gpu_buffer = []
+                    self.gpu_buffers_.append(gpu_buffer)
+                    self.name2gpu_buffer_[name] = gpu_buffer
+                elif isinstance(buffer, Variable):
+                    gpu_buffer = Variable(buffer.data.new().cuda(device))
+                    self.gpu_buffers_.append(gpu_buffer)
+                    self.name2gpu_buffer_[name] = gpu_buffer
+                else:
+                    raise Exception(
+                        "data {} has unsupported type {}".format(
+                            name, type(buffer)))
+                                    
+            self.gpu_batch_ = DataLayout(
+                self.data_layout_.layout_meta, 
+                self.name2gpu_buffer_, 
+                "GPUBatch")
 
     @property
     def batch_size(self):
