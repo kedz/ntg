@@ -6,8 +6,9 @@ import torch.nn.functional as F
 # TODO add tests for exception throwing.
 class MultiClassCrossEntropy(CriterionBase):
 
-    def __init__(self, mode="logit", weight=None, mask_value=-1):
-        super(MultiClassCrossEntropy, self).__init__()
+    def __init__(self, mode="logit", weight=None, mask_value=-1,
+                 name="MultiClassCrossEntropy"):
+        super(MultiClassCrossEntropy, self).__init__(name)
 
         if mode not in ["prob", "logit"]:
             raise Exception("Invalid mode")
@@ -56,8 +57,21 @@ class MultiClassCrossEntropy(CriterionBase):
         return batch_loss
 
     @property
+    def initial_value(self):
+        return float("inf")
+
+    def is_better(self, new_value, old_value):
+        if new_value < old_value:
+            return True
+        else:
+            return False
+
+    @property
     def avg_loss(self):
         if self.tot_examples_ > 0:
             return self.tot_cross_entropy_ / self.tot_examples_
         else:
             return float("nan")
+
+    def criterion_value_from_result_dict(self, result_dict):
+        return result_dict[self.name]["criterion"]    
