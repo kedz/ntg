@@ -3,6 +3,15 @@ from collections import namedtuple
 # TODO make work with dict layout and make todict use ordered dict
 
 class DataLayout(object):
+
+    @staticmethod
+    def _expand(layout_meta, label2data, root_name):
+        return DataLayout(layout_meta, label2data, root_name=root_name)
+
+    def __reduce__(self):
+        return (DataLayout._expand, 
+                (self.layout_meta, self.label2data, self.root_name))
+
     def __init__(self, layout_meta, label2data, root_name="dataset"):
         
         self.layout_meta_ = layout_meta
@@ -11,6 +20,14 @@ class DataLayout(object):
         self.replacement_sites_ = {} # TODO can probably remove this
         self.layout_ = self.recursive_layout_init_(layout_meta, root_name)
         
+
+    def __len__(self):
+        for val in self.label2data_.values():
+            if isinstance(val, (list, tuple)):
+                return len(val)
+            else:
+                return val.size(0)
+
     def recursive_layout_init_(self, ld, name):
         attributes = []
         values = []
@@ -22,7 +39,10 @@ class DataLayout(object):
             else:
                 attributes.append(key)
                 values.append(self.label2data_[value])
-        return namedtuple(name, attributes)(*values) 
+        ntc = namedtuple(name, attributes)
+        # make safe for pickling 
+        globals()[ntc.__name__] = ntc
+        return ntc(*values) 
 
     def __iter__(self):
         for item in self.layout_:
@@ -53,6 +73,10 @@ class DataLayout(object):
         for field in self.layout_._fields:
             d[field] = self.to_dict_helper_(getattr(self.layout_, field))
         return d
+
+    @property
+    def root_name(self):
+        return self.root_name_
 
     @property
     def label2data(self):
