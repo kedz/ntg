@@ -1,7 +1,12 @@
+import ntp
+import torch
 import os
+import urllib.request
 import tarfile
 import re
 import nltk
+import io
+
 
 from .util import get_data_dir
 
@@ -20,14 +25,18 @@ def get_imdb_data_path(split="train"):
     return file_path
 
 def download_imdb_data():
-    root_path = "/home/kedz/Downloads/aclImdb"
 
-    tar_path = "/home/kedz/Downloads/aclImdb_v1.tar.gz"
-
+    url = "http://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz"
+    print("Downloading imdb data from {} ...".format(url))
+    response = urllib.request.urlopen(url)
+    data = response.read()
+    fileobj = io.BytesIO(data)
     train_path = os.path.join(get_data_dir(), "imdb", "imdb.train.tsv") 
     test_path = os.path.join(get_data_dir(), "imdb", "imdb.test.tsv") 
+    if not os.path.exists(os.path.dirname(train_path)):
+        os.makedirs(os.path.dirname(train_path))
     
-    with tarfile.open(tar_path) as tar_fp:
+    with tarfile.open(fileobj=fileobj) as tar_fp:
         with open(train_path, "w") as tr_fp, open(test_path, "w") as te_fp:
 
             tr_fp.write("label\trating\ttext\n")
@@ -61,3 +70,85 @@ def download_imdb_data():
                     tr_fp.write(line)
                 else:
                     te_fp.write(line)
+
+def get_imdb_dataset(split="train", at_least=5, start_token="__START__", 
+                     stop_token=None, lower=True, replace_digit="#"):
+
+    file_path_template = os.path.join(
+        get_data_dir(), "imdb", 
+        "imdb.part={part}.at_least={at_least}.start_token={start_token}." \
+        "stop_token={stop_token}.lower={lower}." \
+        "replace_digit={replace_digit}.bin")
+
+    file_path = file_path_template.format(
+        part=split,
+        at_least=at_least,
+        start_token=start_token if start_token else "",
+        stop_token=stop_token if stop_token else "",
+        lower=lower,
+        replace_digit=replace_digit if replace_digit else "")
+
+
+    if not os.path.exists(file_path):
+        rating_field = ntp.dataio.field_reader.DenseVector("rating")
+        label_field = ntp.dataio.field_reader.Label(
+            "label", vocabulary=["neg", "pos"])
+        input_field = ntp.dataio.field_reader.TokenSequence(
+            "text", at_least=at_least, start_token=start_token,
+            stop_token=stop_token, lower=lower, replace_digit=replace_digit)
+        reader = ntp.dataio.file_reader.tsv_reader(
+            [input_field, label_field, rating_field], skip_header=True)
+
+        train_data_path = get_imdb_data_path(split="train")
+        reader.fit_parameters(train_data_path)
+
+        tr_data_raw = reader.read(train_data_path)
+        (tr_inputs, tr_lengths), (tr_labels,), (tr_ratings) = tr_data_raw
+
+
+        layout = [["inputs", [["sequence", "sequence"], 
+                              ["length", "length"]]],
+                  ["targets", "targets"]]
+
+        tr_dataset = ntp.dataio.Dataset(
+            (tr_inputs, tr_lengths, "sequence"),
+            (tr_lengths, None, "length"),
+            (tr_labels, None, "targets"),
+            layout=layout,
+            lengths=tr_lengths)
+
+        tr_file_path = file_path_template.format(
+            part="train",
+            at_least=at_least,
+            start_token=start_token if start_token else "",
+            stop_token=stop_token if stop_token else "",
+            lower=lower,
+            replace_digit=replace_digit if replace_digit else "")
+
+        torch.save({"dataset": tr_dataset, "reader": reader}, tr_file_path)
+
+        te_data_path = get_imdb_data_path(split="test")
+        te_data_raw = reader.read(te_data_path)
+        (te_inputs, te_lengths), (te_labels,), (te_ratings) = te_data_raw
+
+        te_dataset = ntp.dataio.Dataset(
+            (te_inputs, te_lengths, "sequence"),
+            (te_lengths, None, "length"),
+            (te_labels, None, "targets"),
+            layout=layout,
+            lengths=te_lengths)
+
+        te_file_path = file_path_template.format(
+            part="test",
+            at_least=at_least,
+            start_token=start_token if start_token else "",
+            stop_token=stop_token if stop_token else "",
+            lower=lower,
+            replace_digit=replace_digit if replace_digit else "")
+
+        torch.save({"dataset": te_dataset, "reader": reader}, te_file_path)
+
+    if not os.path.exists(file_path):
+        raise Exception("Failed to create dataset.")
+
+    return torch.load(file_path)
