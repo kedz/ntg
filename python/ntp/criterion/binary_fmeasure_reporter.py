@@ -40,7 +40,7 @@ class BinaryFMeasureReporter(object):
 
         pred_labels = prob.gt(.5).cpu()
         for pred, expected in zip(pred_labels.view(-1),
-                                  expected.data.view(-1)):
+                                  expected.data.cpu().view(-1)):
             if expected == 0 or expected == 1:
                 self.pred_output.append(pred)
                 self.gold_output.append(expected)
