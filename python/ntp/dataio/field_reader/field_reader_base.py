@@ -5,7 +5,7 @@ class FieldReaderBase(ABC):
         super(FieldReaderBase, self).__init__()
         self.data_attributes_ = []
         
-        if not isinstance(field, (str, int)):
+        if not isinstance(field, (str, int, type(None))):
             raise Exception("field must be of type str or int.")
 
         self.field_ = field
@@ -49,8 +49,10 @@ class FieldReaderBase(ABC):
     def read(self, raw_instance):
         if self.field_map is not None:
             return self.read_extract(raw_instance[self.field_map])
-        else:
+        elif self.field is not None:
             return self.read_extract(raw_instance[self.field])
+        else:
+            self.read_extract(raw_instance)
 
     @abstractmethod
     def read_extract(self, data):
