@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+from ..datasets.embeddings import copy_from_pretrained
 
 
 class Embedding(nn.Module):
@@ -17,6 +18,11 @@ class Embedding(nn.Module):
 
         self.lookup_ = nn.Embedding(
             vocab_size + 1, embedding_size, padding_idx=0)
+
+    def use_pretrained(self, embedding_name, vocab, verbose=False):
+        copy_from_pretrained(
+            embedding_name, self.embedding_size, self.lookup_.weight.data, 
+            vocab, verbose=verbose)
 
     @property
     def transpose(self):
