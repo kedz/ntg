@@ -8,6 +8,24 @@ from collections import namedtuple
 
 
 class Dataset(object):
+
+    @staticmethod
+    def _expand(data, layout, batch_size, shuffle, lengths, length_sort):
+        return Dataset(*data, layout=layout, batch_size=batch_size, 
+                       shuffle=shuffle, lengths=lengths, 
+                       length_sort=length_sort)
+
+    def __reduce__(self):
+        items = (
+            [dln for dln in zip(self.data_, self.length_, self.name_)],
+            self.layout.layout_meta,
+            self.batch_size,
+            self.shuffle,
+            self.example_lengths_,
+            self.length_sort,
+        )
+        return (Dataset._expand, items)
+
     def __init__(self, *tensors, layout=None, batch_size=1, 
                  shuffle=True, gpu=-1, lengths=None, length_sort=True):
         
@@ -65,7 +83,21 @@ class Dataset(object):
                     indexed_data.append(tensor[i])
                 data.append((indexed_data, name))
             else:
-                if length is not None:
+
+                if isinstance(length, (list, tuple)):
+                    lengths = length
+                    new_lengths = []
+                    for l in lengths:
+                        if l is not None:
+                            new_lengths.append(l.index_select(0, index))
+                        else:
+                            new_lengths.append(l)
+                    data.append((
+                        tensor.index_select(0, index),
+                        new_lengths,
+                        name))
+
+                elif length is not None:
                     data.append((
                         tensor.index_select(0, index),
                         length.index_select(0, index), 
@@ -147,7 +179,19 @@ class Dataset(object):
 
                 else:
                     length = self.length_[j]
-                    if length is not None:
+                    if isinstance(length, (tuple, list)):
+                        lengths = length
+                        pre_buffer = self.data_[j]
+                        for ax, length in enumerate(lengths, 1):
+                            if length is None:
+                                continue
+                            max_len = length.index_select(
+                                0, indices_batch).max()
+                            pre_buffer = pre_buffer.narrow(ax, 0, max_len)
+                        buffer = pre_buffer.index_select(
+                            0, indices_batch, out=self.cpu_buffers_[j].data)
+
+                    elif length is not None:
                         max_len = length.index_select(
                             0, indices_batch).max()
                         buffer = self.data_[j][:,:max_len].index_select(
