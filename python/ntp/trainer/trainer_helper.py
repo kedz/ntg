@@ -6,7 +6,11 @@ from collections import defaultdict
 
 def generate_splits(indices, train_per=.8, valid_per=.1, shuffle=True):
 
-    if isinstance(indices, (list, tuple)):
+    if isinstance(indices, int) and indices > 0:
+        indices = torch.LongTensor([i for i in range(indices)])
+        if shuffle:
+            random.shuffle(indices)
+    elif isinstance(indices, (list, tuple)):
         indices = torch.LongTensor(indices)
         if shuffle:
             random.shuffle(indices)
@@ -56,8 +60,10 @@ def generate_splits(indices, train_per=.8, valid_per=.1, shuffle=True):
         return train_indices, test_indices
 
 def stratified_generate_splits(indices, labels, train_per=.8, valid_per=.1):
-
-    if isinstance(indices, (list, tuple)):
+    if isinstance(indices, int) and indices > 0:
+        # TODO rethink this what if this number is differnt than labels
+        indices = torch.LongTensor([i for i in range(indices)])
+    elif isinstance(indices, (list, tuple)):
         indices = torch.LongTensor(indices)
     elif isinstance(indices, torch.LongTensor):
         pass 
