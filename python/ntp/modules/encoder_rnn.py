@@ -72,6 +72,30 @@ class EncoderRNN(nn.Module):
         return self(inputs, length=length, prev_state=prev_state, 
                     return_context=False) 
 
+    def encoder_context(self, inputs, length=None, prev_state=None):
+        context = self(inputs, length=length, prev_state=prev_state,
+                       return_state=False)
+
+        if isinstance(context, nn.utils.rnn.PackedSequence):
+            context, _ = nn.utils.rnn.pad_packed_sequence(
+                context, batch_first=False)
+
+        if self.rnn.bidirectional:
+            if self.merge_mode == "add":
+                sequence_size = context.size(0)
+                batch_size = context.size(1)
+                return context.view(sequence_size, batch_size, 2, -1).sum(2)
+
+            elif self.merge_mode == "mean":
+                sequence_size = context.size(0)
+                batch_size = context.size(1)
+                return context.view(sequence_size, batch_size, 2, -1).mean(2)
+
+            else:
+                return context
+
+        return context         
+        
     def encoder_state_output(self, inputs, length=None, prev_state=None):
         state = self.encoder_state(
             inputs, length=length, prev_state=prev_state)
