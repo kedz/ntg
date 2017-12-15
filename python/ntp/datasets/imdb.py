@@ -6,15 +6,16 @@ import tarfile
 import re
 import nltk
 import io
+import sys
 
 
-from .util import get_data_dir
+from .util import get_data_dir, download_url_to_buffer
 
 
 def get_imdb_data_path(split="train"):
 
-    if split not in ["train", "test"]:
-        raise Exception("split must be either 'train' or 'test'.")
+    if split not in ["train", "test", "unsup"]:
+        raise Exception("split must be either 'train', 'test', or 'unsup'.")
 
     file_path = os.path.join(
         get_data_dir(), "imdb", "imdb.{}.tsv".format(split))  
@@ -28,19 +29,29 @@ def download_imdb_data():
 
     url = "http://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz"
     print("Downloading imdb data from {} ...".format(url))
-    response = urllib.request.urlopen(url)
-    data = response.read()
-    fileobj = io.BytesIO(data)
+    fileobj = download_url_to_buffer(url)
+    
     train_path = os.path.join(get_data_dir(), "imdb", "imdb.train.tsv") 
     test_path = os.path.join(get_data_dir(), "imdb", "imdb.test.tsv") 
+    unsup_path = os.path.join(get_data_dir(), "imdb", "imdb.unsup.tsv") 
+
     if not os.path.exists(os.path.dirname(train_path)):
         os.makedirs(os.path.dirname(train_path))
     
+    total_train = 0
+    total_test = 0
+    total_unsup = 0
+
+    status_tmp = "\rpreprocessed {:0.3f}% train | {:0.3f}% test " \
+        "| {:0.3f}% unsup"
+
     with tarfile.open(fileobj=fileobj) as tar_fp:
-        with open(train_path, "w") as tr_fp, open(test_path, "w") as te_fp:
+        with open(train_path, "w") as tr_fp, open(test_path, "w") as te_fp, \
+                open(unsup_path, "w") as unsup_fp:
 
             tr_fp.write("label\trating\ttext\n")
             te_fp.write("label\trating\ttext\n")
+            unsup_fp.write("text\n")
 
             for member in tar_fp.getmembers():
                 items = member.name.split("/")
@@ -53,8 +64,22 @@ def download_imdb_data():
                 if part not in ["train", "test"]:
                     continue
 
-                if label not in ["pos", "neg"]:
+                if label not in ["pos", "neg", "unsup"]:
                     continue
+
+                if part == "train" and label != "unsup":
+                    total_train += 1
+                elif part == "test":
+                    total_test += 1
+                else:
+                    total_unsup += 1
+
+                sys.stdout.write(
+                    status_tmp.format(
+                        total_train / 25000 * 100,
+                        total_test / 25000 * 100,
+                        total_unsup / 50000 * 100))
+                sys.stdout.flush()
 
                 review_id, rating = os.path.splitext(filename)[0].split("_")
                 member_fp = tar_fp.extractfile(member)
@@ -63,13 +88,17 @@ def download_imdb_data():
                 text = re.sub(r"<br.*?>", r" ", text)
                 tokens = nltk.word_tokenize(text)
      
-                line = "{}\t{}\t{}\n".format(
-                    label, rating, " ".join(tokens))
-
-                if part == "train":
+                if part == "train" and label in ["neg", "pos"]:
+                    line = "{}\t{}\t{}\n".format(
+                        label, rating, " ".join(tokens))
                     tr_fp.write(line)
-                else:
+                elif part == "test":
+                    line = "{}\t{}\t{}\n".format(
+                        label, rating, " ".join(tokens))
                     te_fp.write(line)
+                else:
+                    unsup_fp.write("{}\n".format(" ".join(tokens)))
+    print("") 
 
 def get_imdb_dataset(split="train", at_least=5, start_token="__START__", 
                      stop_token=None, lower=True, replace_digit="#"):
