@@ -12,9 +12,13 @@ class FileReaderBase(ABC):
     def readers(self):
         return self.readers_
 
-    def fit_parameters(self, path=None):
-        if path is not None:
-            self.apply_readers(path) 
+    def fit_parameters(self, paths=None):
+        if isinstance(paths, (list, tuple)):
+            for path in paths:
+                self.apply_readers(path) 
+        elif paths is not None:
+            self.apply_readers(paths) 
+
         for reader in self.readers_:
             reader.fit_parameters()
             reader.reset_saved_data()
