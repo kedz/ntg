@@ -1,11 +1,14 @@
 from .file_reader_base import FileReaderBase
+import sys
 
 
 class XSVReader(FileReaderBase):
-    def __init__(self, readers, sep, skip_header=False, verbose=False):
+    def __init__(self, readers, sep, skip_header=False, verbose=False,
+                 show_progress=False):
         super(XSVReader, self).__init__(readers, verbose=verbose)
         self.sep_ = sep
         self.skip_header_ = skip_header
+        self.show_progress = show_progress
 
     @property
     def sep(self):
@@ -20,7 +23,7 @@ class XSVReader(FileReaderBase):
         self.skip_header_ = skip_header
 
     def apply_readers(self, path):
-
+        read_lines = 0
         with open(path, "r") as fp:
             if self.skip_header:
                 header_dict = {}
@@ -39,9 +42,18 @@ class XSVReader(FileReaderBase):
                     reader.clear_field_map()
 
             for line in fp:
+                read_lines += 1
+                if self.show_progress:
+                    sys.stdout.write(
+                        "\rread {} lines".format(read_lines))
+                    sys.stdout.flush()
+
                 items = line.strip().split(self.sep)
                 for reader in self.readers:
                     reader.read(items)
+
+            if self.show_progress:
+                print("")
 
 def tsv_reader(readers, **kwargs):
     return XSVReader(readers, "\t", **kwargs)
