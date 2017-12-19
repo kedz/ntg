@@ -1,9 +1,10 @@
 from .multiclass_fmeasure_reporter import MultiClassFMeasureReporter
 
 class SequenceMultiClassFMeasureReporter(MultiClassFMeasureReporter):
-    def __init__(self, num_classes, labels=None, mode="logit", mask_value=-1):
+    def __init__(self, num_classes, labels=None, mode="logit", mask_value=-1,
+                 report_all=True):
         super(SequenceMultiClassFMeasureReporter, self).__init__(
-            num_classes, labels=labels, mode=mode)
+            num_classes, labels=labels, mode=mode, report_all=report_all)
 
         self.mask_value_ = mask_value
 

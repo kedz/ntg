@@ -2,11 +2,12 @@ from sklearn.metrics import precision_recall_fscore_support
 
 
 class MultiClassFMeasureReporter(object):
-    def __init__(self, num_classes, labels=None, mode="logit"):
+    def __init__(self, num_classes, labels=None, mode="logit",
+                 report_all=True):
         if mode not in ["prob", "logit"]:
             raise Exception("mode must be either 'prob' or 'logit'.")
 
-        
+        self.report_all = report_all       
         self.num_classes_ = num_classes
         
         if labels is None:
@@ -24,6 +25,7 @@ class MultiClassFMeasureReporter(object):
 
         self.pred_output = []
         self.gold_output = []
+
 
     @property
     def num_classes(self):
@@ -60,7 +62,12 @@ class MultiClassFMeasureReporter(object):
 
     def result_dict(self):
         prfs_all = precision_recall_fscore_support(
-            self.gold_output, self.pred_output, average=None)
+            self.gold_output, self.pred_output, average=None,
+            labels=[i for i in range(len(self.labels))])
+ 
+        prfs_macro = precision_recall_fscore_support(
+            self.gold_output, self.pred_output, average="macro",
+            labels=[i for i in range(len(self.labels))])
         
         results = {self.name: {}}
         for l, label in enumerate(self.labels):
@@ -71,23 +78,35 @@ class MultiClassFMeasureReporter(object):
             results[self.name][label] = {"precision": prec, 
                                          "recall": recall, 
                                          "f-measure": fmeasure}
+
+        results[self.name]["macro avg."] = {"precision": prfs_macro[0],
+                                            "recall": prfs_macro[1],
+                                            "f-measure": prfs_macro[2]}
         return results
 
     def report_string(self):
         rd = self.result_dict()
 
+        
         label_len = max([len(label) for label in self.labels])
         tmp = "class: {label:" + str(label_len)  + "s} " \
             "prec: {precision:0.3f} recall: {recall:0.3f} " \
             "f-meas.: {f-measure:0.3f}"
         
         report_lines = []
-        for label in self.labels:
-            report_lines.append(
-                tmp.format(**rd[self.name][label], label=label))
+        if self.report_all:
+            for label in self.labels:
+                report_lines.append(
+                    tmp.format(**rd[self.name][label], label=label))
+        report_lines.append(
+            ("{label:"+ str(7 + label_len) +"s} " \
+             "prec: {precision:0.3f} recall: {recall:0.3f} " \
+             "f-meas.: {f-measure:0.3f}").format(
+                **rd[self.name]["macro avg."], label="macro avg."))
+
         max_len = max([len(self.name)] + [len(line) for line in report_lines])
         
-        for i in range(len(self.labels)):
+        for i in range(len(report_lines)):
             report_lines[i] = "| " + report_lines[i] \
                 + " " * (max_len - len(report_lines[i])) + " |" 
 
