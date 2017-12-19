@@ -32,3 +32,17 @@ def download_url_to_buffer(url, chunk_size=5096):
     print("")
     buffer.seek(0)
     return buffer
+
+def download_url_to_file(url, path, chunk_size=5096):
+    response = urllib.request.urlopen(url)
+    size = int(response.headers['content-length'])
+    read = 0
+    with open(path, "wb") as fp:
+        while read < size:
+            chunk = response.read(chunk_size)
+            read += len(chunk)
+            fp.write(chunk)
+            sys.stdout.write("\rread {}/{} bytes ({:0.3f}%)".format(
+                read, size, read / size * 100))
+            sys.stdout.flush()
+        print("")

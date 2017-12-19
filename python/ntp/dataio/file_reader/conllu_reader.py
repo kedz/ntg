@@ -31,6 +31,9 @@ class CONLLUReader(FileReaderBase):
                 elif in_ex == True:
                     in_ex = False
                     sizes.append(example_size)
+            if in_ex:
+                in_ex = False
+                sizes.append(example_size)
         return sizes
     
     def read(self, path):
