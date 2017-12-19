@@ -66,6 +66,14 @@ class Dataset(object):
 
         self.gpu = gpu
 
+
+    def __getitem__(self, indexer):
+        if isinstance(indexer, slice):
+            index = [i for i in range(self.size)][indexer]
+        else:
+            index = [[i for i in range(self.size)][indexer]]
+        return self.index_select(index)
+
     @property
     def layout(self):
         return self.data_layout_
