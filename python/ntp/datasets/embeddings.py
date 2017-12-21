@@ -1,4 +1,5 @@
-from .util import get_data_dir
+from .util import get_data_dir, download_url_to_file
+from ..dataio import Vocabulary
 import os
 import urllib.request
 import zipfile
@@ -25,12 +26,13 @@ def copy_from_pretrained(name, size, dest, vocab, verbose=False):
 
 def get_glove_iter(name, size):
     path = get_glove_data_path(name, size)
+    filename = "{}.{}d.txt".format(name, size)
     with zipfile.ZipFile(path) as zfp:
 
-        if not "glove.840B.300d.txt" in zfp.namelist():
+        if not filename in zfp.namelist():
             raise Exception(
                 "Bad file: {}\nTry deleting and run again.".format(path))
-        with zfp.open("glove.840B.300d.txt") as fp:
+        with zfp.open(filename) as fp:
             for line in fp:
                 items = line.split()
                 word = items[0].decode("utf8")
@@ -38,10 +40,36 @@ def get_glove_iter(name, size):
                     return torch.FloatTensor([float(x) for x in items[1:]])
                 yield word, lazy_embedding
 
+def get_glove_embeddings(name, size, filter_support=None):
+    path = get_glove_data_path(name, size)
+    filename = "{}.{}d.txt".format(name, size)
+    with zipfile.ZipFile(path) as zfp:
+        if not filename in zfp.namelist():
+            raise Exception(
+                "Bad file: {}\nTry deleting and run again.".format(path))
+        with zfp.open(filename) as fp:
+            words = []
+            data = []
+            for line in fp:
+                items = line.split()
+                word = items[0].decode("utf8")
+
+                if filter_support is not None:
+                    if word not in filter_support:
+                        continue
+
+                words.append(word)
+                data.append([float(x) for x in items[1:]])
+            vocab = Vocabulary(special_tokens=words, zero_indexing=True)
+            vocab.freeze()
+            return vocab, torch.FloatTensor(data)
 
 def get_glove_data_path(name, size):
     if name == "glove.840B" and size == 300:
         filename = "{}.{}d.zip".format(name, size)
+        path = os.path.join(get_data_dir(), "glove", filename)
+    elif name == "glove.6B" and size in [50, 100, 200, 300]:
+        filename = "glove.6B.zip"
         path = os.path.join(get_data_dir(), "glove", filename)
     else:
         raise Exception()
@@ -49,25 +77,7 @@ def get_glove_data_path(name, size):
     if not os.path.exists(path):
         if not os.path.exists(os.path.dirname(path)):
             os.makedirs(os.path.dirname(path))
+        url = "http://nlp.stanford.edu/data/{}".format(filename)   
+        download_url_to_file(url, path)
 
-        url = "http://nlp.stanford.edu/data/{}".format(filename)
-
-        response = urllib.request.urlopen(url)
-        size = int(response.headers['content-length'])
-        read = 0
-
-        with open(path, "wb") as fp:
-            while read < size:
-                chunk = response.read(2048)
-                read += len(chunk)
-                fp.write(chunk)
-                sys.stdout.write("\r{:0.3f}%".format(read / size * 100))
-                sys.stdout.flush()
-        print("")
     return path
-        
-#
-#path = "glove.840B.300d.zip"
-
-#
-#
