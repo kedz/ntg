@@ -1,19 +1,16 @@
-#!/usr/bin/env python
-
-from distutils.core import setup
-
+from setuptools import setup
 
 packages = [
-    'nt', 
-    'nt.dataio', 
-    'nt.dataio.field_reader', 
-    'nt.dataio.file_reader', 
-    'nt.modules',
-    'nt.models',
-    'nt.criterion',
-    'nt.optimizer',
-    'nt.datasets',
-    'nt.trainer',
+    'ntp', 
+    'ntp.dataio', 
+    'ntp.dataio.field_reader', 
+    'ntp.dataio.file_reader', 
+    'ntp.modules',
+    'ntp.models',
+    'ntp.criterion',
+    'ntp.optimizer',
+    'ntp.datasets',
+    'ntp.trainer',
 ]
 
 setup(name='Neural Text',
@@ -21,5 +18,11 @@ setup(name='Neural Text',
       description='Neural text processing library using pytorch.',
       author='Chris Kedzie',
       author_email='kedzie@cs.columbia.edu',
-      packages=packages
-     )
+      packages=packages,
+      install_requires=[
+          "numpy",
+          "scipy",
+          "sklearn",
+          "pandas",
+          "nltk"]  
+)
