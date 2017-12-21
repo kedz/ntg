@@ -142,3 +142,6 @@ class Vocabulary(object):
         else:
             for token in self.index2token_[1:]:
                 yield token
+
+    def contains(self, token):
+        return self.token2index_.get(token, None) is not None
