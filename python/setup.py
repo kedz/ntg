@@ -13,7 +13,7 @@ packages = [
     'ntp.trainer',
 ]
 
-setup(name='Neural Text',
+setup(name='ntp',
       version='0.1',
       description='Neural text processing library using pytorch.',
       author='Chris Kedzie',
