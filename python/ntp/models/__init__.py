@@ -1,3 +1,6 @@
+
+from . import sentence_embedding
+
 from .mlp_classifier import MLPClassifier
 from .sequence_classifier import SequenceClassifier
 from .sequence_tagger import SequenceTagger
