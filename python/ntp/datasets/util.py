@@ -1,6 +1,7 @@
 import sys
 import os
 import urllib.request
+import requests
 import io
 
 
@@ -46,3 +47,26 @@ def download_url_to_file(url, path, chunk_size=5096):
                 read, size, read / size * 100))
             sys.stdout.flush()
         print("")
+
+def download_google_drive_to_buffer(id, chunk_size=32768):
+
+    URL = "https://docs.google.com/uc?export=download&fields=*"
+    session = requests.Session()
+    response = session.get(URL, params = {'id': id}, stream=True)
+    for key, value in response.cookies.items():
+        if key.startswith('download_warning'):
+            response = session.get(
+                URL, params = {'id': id, 'confirm': value}, stream=True)
+
+    read = 0
+    buffer = io.BytesIO()
+    for chunk in response.iter_content(chunk_size):
+        if chunk:
+            buffer.write(chunk)
+            read += len(chunk)
+            sys.stdout.write("\rread {} bytes".format(
+                read))
+            sys.stdout.flush()
+    print("")
+    buffer.seek(0)
+    return buffer
