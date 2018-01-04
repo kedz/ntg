@@ -14,7 +14,11 @@ class SequenceMultiClassFMeasureReporter(MultiClassFMeasureReporter):
 
     def update(self, output, expected):
         mask = expected.ne(self.mask_value)
-        _, pred_labels = output.max(2)
+
+        if output.dim() == 3:
+            _, pred_labels = output.max(2)
+        else:
+            pred_labels = output
 
         self.pred_output.extend(
             pred_labels.masked_select(mask).data.tolist())
