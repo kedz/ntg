@@ -86,3 +86,8 @@ class BinaryFMeasureReporter(object):
 
     def criterion_value_from_result_dict(self, result_dict):
         return result_dict[self.name]["f-measure"]    
+
+    @property
+    def summary_stat(self):
+        return precision_recall_fscore_support(
+            self.gold_output, self.pred_output, average="binary")[2]
