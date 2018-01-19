@@ -156,7 +156,7 @@ class LinearChainDecoder(nn.Module):
 
             if first_batch_size > cur_batch_size:
                 pad_size = first_batch_size - cur_batch_size
-                pad = prev_index.data.new([-1] * pad_size)
+                pad = Variable(prev_index.data.new([-1] * pad_size))
                 viterbi_paths[step] = torch.cat([prev_index, pad]).view(-1, 1)
             else:
                 viterbi_paths[step] = prev_index.view(-1, 1)
@@ -181,8 +181,15 @@ class LinearChainDecoder(nn.Module):
 
         prev_batch_size = first_batch_size
         bp_scores[0] = start_ftr + emission_ftr
-        bp_states[0] = Variable(
-            torch.LongTensor(max_batch_size, self.num_states).fill_(-1))
+        
+        if emission_factors.is_cuda:
+            bp_states[0] = Variable(
+                torch.cuda.LongTensor(
+                    max_batch_size, self.num_states).fill_(-1))
+        else:
+            bp_states[0] = Variable(
+                torch.LongTensor(
+                    max_batch_size, self.num_states).fill_(-1))
 
         batch_size = first_batch_size
 
