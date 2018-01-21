@@ -122,5 +122,5 @@ class MultiClassFMeasureReporter(object):
         return new_value > old_value
 
     def criterion_value_from_result_dict(self, result_dict):
-        return result_dict[self.name]["f-measure"]    
+        return result_dict[self.name]["macro avg."]["f-measure"]    
 
