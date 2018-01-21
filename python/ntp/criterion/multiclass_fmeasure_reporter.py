@@ -115,3 +115,12 @@ class MultiClassFMeasureReporter(object):
         lines = [line1] + report_lines + [line3]
         return lines, len(lines), len(line1)
 
+    def initial_value(self):
+        return 0.
+
+    def is_better(self, new_value, old_value):
+        return new_value > old_value
+
+    def criterion_value_from_result_dict(self, result_dict):
+        return result_dict[self.name]["f-measure"]    
+
