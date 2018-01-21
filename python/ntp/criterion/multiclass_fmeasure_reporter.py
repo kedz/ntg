@@ -115,6 +115,7 @@ class MultiClassFMeasureReporter(object):
         lines = [line1] + report_lines + [line3]
         return lines, len(lines), len(line1)
 
+    @property
     def initial_value(self):
         return 0.
 
